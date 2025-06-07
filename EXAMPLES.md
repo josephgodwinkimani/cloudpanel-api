@@ -1,6 +1,8 @@
 # CloudPanel API Examples
 
-This document provides examples of how to use the CloudPanel API endpoints.
+[![GitHub Repository](https://img.shields.io/badge/GitHub-iamfafakkk/cloudpanel--api-blue)](https://github.com/iamfafakkk/cloudpanel-api.git)
+
+This document provides comprehensive examples of how to use all CloudPanel API endpoints with real-world scenarios.
 
 ## Authentication
 
