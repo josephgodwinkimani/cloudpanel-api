@@ -375,7 +375,7 @@ curl -X DELETE \
 
 ## Response Format
 
-All API responses follow this format:
+All API responses follow a consistent JSON format:
 
 ### Success Response
 
@@ -384,11 +384,16 @@ All API responses follow this format:
   "success": true,
   "message": "Operation completed successfully",
   "timestamp": "2025-06-08T10:30:00.000Z",
-  "data": {
-    "command": "clpctl command executed",
-    "output": "Command output",
-    "executedAt": "2025-06-08T10:30:00.000Z"
-  }
+  "data": [
+    {
+      "user_name": "john.doe",
+      "first_name": "John",
+      "last_name": "Doe",
+      "e-mail": "john.doe@example.com",
+      "role": "Admin",
+      "status": "Active"
+    }
+  ]
 }
 ```
 
@@ -397,8 +402,23 @@ All API responses follow this format:
 ```json
 {
   "success": false,
-  "error": "Error message",
+  "error": "Failed to list users",
   "timestamp": "2025-06-08T10:30:00.000Z",
+  "details": "/bin/sh: clpctl: command not found"
+}
+```
+
+### Validation Error Response
+
+```json
+{
+  "error": "Validation Error",
+  "details": [
+    "\"userName\" is required",
+    "\"email\" must be a valid email"
+  ]
+}
+```
   "details": "Additional error details"
 }
 ```

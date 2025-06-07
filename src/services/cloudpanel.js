@@ -31,12 +31,7 @@ class CloudPanelService {
         } else {
           logger.info(`Command succeeded: ${fullCommand}`);
           const parsedOutput = ResponseUtils.parseCliOutput(stdout);
-          resolve({
-            success: true,
-            data: parsedOutput,
-            command: fullCommand,
-            executedAt: new Date().toISOString()
-          });
+          resolve(parsedOutput);
         }
       });
     });
