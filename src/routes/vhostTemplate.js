@@ -61,8 +61,8 @@ router.post('/add', validate(schemas.addVhostTemplate), BaseController.asyncHand
  */
 router.delete('/delete', validate(schemas.deleteVhostTemplate), BaseController.asyncHandler(async (req, res) => {
   try {
-    const { name } = req.body;
-    const result = await cloudpanelService.deleteVhostTemplate(name);
+    const { name, force } = req.body;
+    const result = await cloudpanelService.deleteVhostTemplate(name, force);
     
     BaseController.sendSuccess(res, 'Vhost template deleted successfully', result);
   } catch (error) {

@@ -29,8 +29,8 @@ router.post('/add', validate(schemas.addUser), BaseController.asyncHandler(async
  */
 router.delete('/delete', validate(schemas.deleteUser), BaseController.asyncHandler(async (req, res) => {
   try {
-    const { userName } = req.body;
-    const result = await cloudpanelService.deleteUser(userName);
+    const { userName, force } = req.body;
+    const result = await cloudpanelService.deleteUser(userName, force);
     
     BaseController.sendSuccess(res, 'User deleted successfully', result);
   } catch (error) {

@@ -100,7 +100,8 @@ const schemas = {
   }),
 
   deleteUser: Joi.object({
-    userName: Joi.string().required()
+    userName: Joi.string().required(),
+    force: Joi.boolean().default(true)
   }),
 
   resetPassword: Joi.object({
@@ -119,7 +120,8 @@ const schemas = {
   }),
 
   deleteVhostTemplate: Joi.object({
-    name: Joi.string().required()
+    name: Joi.string().required(),
+    force: Joi.boolean().default(true)
   }),
 
   viewVhostTemplate: Joi.object({

@@ -10,15 +10,14 @@ A comprehensive Node.js API wrapper for CloudPanel CLI commands. This RESTful AP
 
 - 🌐 **Cloudflare Management**: Update and sync IP addresses
 - 🔐 **CloudPanel Security**: Enable/disable basic authentication
-- 🗄️ **Database Operations**: Complete CRUD operations, import/export, credentials management
-- 🔒 **SSL Certificates**: Automated Let's Encrypt certificate installation
-- 🌍 **Site Management**: Support for Node.js, PHP, Python, Static, and Reverse Proxy sites
-- 👤 **User Management**: User operations with MFA support
-- 📄 **Vhost Templates**: Complete template management system
-- 🛡️ **Security**: API key authentication, rate limiting, input validation
-- 📊 **Monitoring**: Built-in health checks and performance metrics
-- 🐳 **Docker Ready**: Complete containerization support
-- 📚 **Comprehensive Documentation**: Examples, deployment guides, and API docs
+- 🗄️ **Database Operations**: Create, import, export, and manage databases
+- 🔒 **SSL/TLS Certificates**: Install Let's Encrypt and custom certificates
+- 🌍 **Site Management**: Deploy Node.js, PHP, Python, static sites, and reverse proxies
+- 👥 **User Administration**: Complete user lifecycle management
+- 📋 **Vhost Templates**: Custom template management and deployment
+- ⚡ **Smart Confirmation Handling**: Automatic handling of CLI confirmation prompts (no more hanging commands!)
+- 🔄 **Force Mode Support**: Optional force mode for deletion operations
+- 🚀 **Production Ready**: Built for automated deployment and CI/CD workflows
 
 ## 🚀 Quick Start
 
