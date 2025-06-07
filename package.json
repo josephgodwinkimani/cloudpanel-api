@@ -1,6 +1,6 @@
 {
   "name": "cloudpanel-api-node",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Node.js API wrapper for CloudPanel CLI commands",
   "main": "src/index.js",
   "scripts": {
