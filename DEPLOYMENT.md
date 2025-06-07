@@ -1,6 +1,8 @@
 # CloudPanel API Deployment Guide
 
-This guide covers different deployment scenarios for the CloudPanel API.
+[![GitHub Repository](https://img.shields.io/badge/GitHub-iamfafakkk/cloudpanel--api-blue)](https://github.com/iamfafakkk/cloudpanel-api.git)
+
+This comprehensive guide covers different deployment scenarios for the CloudPanel API, from development to production environments.
 
 ## Prerequisites
 
@@ -107,13 +109,13 @@ pm2 startup
 sudo tee /etc/systemd/system/cloudpanel-api.service > /dev/null << EOF
 [Unit]
 Description=CloudPanel API Service
-Documentation=https://github.com/your-repo/cloudpanel-api
+Documentation=https://github.com/iamfafakkk/cloudpanel-api
 After=network.target
 
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/path/to/cloudpanel-api
+WorkingDirectory=/opt/cloudpanel-api
 Environment=NODE_ENV=production
 Environment=PORT=3000
 ExecStart=/usr/bin/node src/index.js
