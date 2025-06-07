@@ -33,7 +33,7 @@ nvm use 18
 
 ```bash
 # Clone or copy your project
-git clone <your-repo> cloudpanel-api
+git clone https://github.com/iamfafakkk/cloudpanel-api.git cloudpanel-api
 cd cloudpanel-api
 
 # Install dependencies
