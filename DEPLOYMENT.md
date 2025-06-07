@@ -21,21 +21,21 @@ This comprehensive guide covers different deployment scenarios for the CloudPane
 sudo apt update && sudo apt upgrade -y
 
 # Install Node.js (Ubuntu/Debian)
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Or install via nvm for user-level installation
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 source ~/.bashrc
-nvm install 18
-nvm use 18
+nvm install 22
+nvm use 22
 ```
 
 #### Step 2: Deploy the Application
 
 ```bash
 # Clone or copy your project
-git clone https://github.com/iamfafakkk/cloudpanel-api.git cloudpanel-api
+git clone https://github.com/iamfafakkk/cloudpanel-api.git
 cd cloudpanel-api
 
 # Install dependencies
