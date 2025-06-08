@@ -136,6 +136,12 @@ check_prerequisites() {
         warning "curl is not installed. Health checks may not work properly."
     fi
     
+    # Check UFW for firewall management
+    if ! command -v ufw &> /dev/null; then
+        warning "UFW is not installed. Firewall configuration will be skipped."
+        warning "Please manually configure your firewall to allow the application port."
+    fi
+    
     success "Prerequisites check completed"
 }
 
@@ -388,6 +394,9 @@ configure_environment() {
     # Update PORT variable for this script
     PORT="$new_port"
     
+    # Configure UFW firewall for the selected port
+    configure_ufw_port "$new_port"
+    
     echo
     success "Environment configuration completed!"
     echo -e "${BLUE}Port:${NC} $new_port"
@@ -395,11 +404,54 @@ configure_environment() {
     echo
 }
 
+# Configure UFW firewall for application port
+configure_ufw_port() {
+    local port="$1"
+    
+    # Check if UFW is installed
+    if ! command -v ufw &> /dev/null; then
+        warning "UFW is not installed. Skipping firewall configuration."
+        warning "Please manually configure your firewall to allow port $port"
+        return 0
+    fi
+    
+    log "Configuring UFW firewall for port $port..."
+    
+    # Check if UFW is active
+    if ! ufw status | grep -q "Status: active"; then
+        warning "UFW is not active. Firewall rules will be added but not enforced."
+        read -p "Do you want to enable UFW firewall? (y/N): " -r
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log "Enabling UFW firewall..."
+            ufw --force enable
+            success "UFW firewall enabled"
+        else
+            log "UFW will remain inactive. Rules added but not enforced."
+        fi
+    fi
+    
+    # Check if port is already allowed
+    if ufw status numbered | grep -q ":$port "; then
+        log "Port $port is already allowed in UFW"
+    else
+        log "Adding UFW rule to allow port $port..."
+        ufw allow "$port"/tcp
+        success "UFW rule added: Allow port $port/tcp"
+    fi
+    
+    # Show current UFW status
+    log "Current UFW status:"
+    ufw status numbered | grep -E "(Status:|$port)" || echo "No rules found for port $port"
+}
+
 # Create PM2 ecosystem file
 create_pm2_config() {
     log "Creating PM2 ecosystem configuration..."
     
-    cat > ecosystem.config.js << 'EOF'
+    # Get the current port from .env file
+    local config_port=$(grep "^PORT=" .env 2>/dev/null | cut -d'=' -f2 || echo "3000")
+    
+    cat > ecosystem.config.js << EOF
 module.exports = {
   apps: [{
     name: 'cloudpanel-api',
@@ -408,11 +460,11 @@ module.exports = {
     exec_mode: 'cluster',
     env: {
       NODE_ENV: 'production',
-      PORT: 3000
+      PORT: ${config_port}
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: 3000
+      PORT: ${config_port}
     },
     error_file: 'logs/pm2-error.log',
     out_file: 'logs/pm2-out.log',
@@ -436,7 +488,7 @@ module.exports = {
 }
 EOF
     
-    success "PM2 ecosystem configuration created"
+    success "PM2 ecosystem configuration created with port $config_port"
 }
 
 # Backup current deployment
