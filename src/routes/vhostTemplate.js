@@ -29,12 +29,9 @@ const parseTableToJson = (tableArray) => {
 
   // Parse each data row
   const jsonResult = dataRows.map((row) => {
-    const dataRegex = /\|\s*([^|]*?)\s*\|/g;
-    const values = [];
-    let dataMatch;
-    while ((dataMatch = dataRegex.exec(row)) !== null) {
-      values.push(dataMatch[1].trim());
-    }
+    // Split by | and remove first and last empty elements
+    const parts = row.split('|');
+    const values = parts.slice(1, -1).map(part => part.trim());
 
     // Create object with headers as keys
     const templateObj = {};
