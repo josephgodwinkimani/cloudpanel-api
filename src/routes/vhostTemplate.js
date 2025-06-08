@@ -46,7 +46,10 @@ const parseTableToJson = (tableArray) => {
         .replace(/\s+/g, " ")
         .trim()
         .replace(/\s(.)/g, (match, letter) => letter.toUpperCase());
-      templateObj[key] = values[index] || "";
+
+      // Handle empty values properly - use null instead of empty string
+      const value = values[index] || "";
+      templateObj[key] = value === "" ? null : value;
     });
 
     return templateObj;
