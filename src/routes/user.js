@@ -10,37 +10,42 @@ const parseTableToJson = (tableArray) => {
     return [];
   }
 
-  // Find header row (contains column names)
-  const headerRow = tableArray.find((row) => row.includes("User Name"));
+  // Find header row (contains column names and is surrounded by separators)
+  let headerRow = null;
+  let headerIndex = -1;
+  
+  for (let i = 0; i < tableArray.length; i++) {
+    const row = tableArray[i];
+    // Look for header row that contains column names and pipes
+    if (row.includes("User Name") && row.includes("|") && !row.includes("+")) {
+      headerRow = row;
+      headerIndex = i;
+      break;
+    }
+  }
+  
   if (!headerRow) return [];
 
-  // Extract headers using regex
-  const headerRegex = /\|\s*([^|]+?)\s*\|/g;
-  const headers = [];
-  let headerMatch;
-  while ((headerMatch = headerRegex.exec(headerRow)) !== null) {
-    headers.push(headerMatch[1].trim());
-  }
-
-  // Find data rows (exclude separator rows with +, -, |)
-  const dataRows = tableArray.filter(
-    (row) =>
-      row.includes("|") && !row.includes("+") && !row.includes("User Name")
+  // Extract headers - split by | and clean up
+  const headerParts = headerRow.split("|").map(part => part.trim()).filter(part => part.length > 0);
+  
+  // Find all data rows (contain | but not + and are not the header row)
+  const dataRows = tableArray.filter((row, index) => 
+    row.includes("|") && 
+    !row.includes("+") && 
+    index !== headerIndex && 
+    row.trim().length > 0
   );
 
   // Parse each data row
   const jsonResult = dataRows.map((row) => {
-    const dataRegex = /\|\s*([^|]+?)\s*\|/g;
-    const values = [];
-    let dataMatch;
-    while ((dataMatch = dataRegex.exec(row)) !== null) {
-      values.push(dataMatch[1].trim());
-    }
-
+    // Split by | and clean up
+    const values = row.split("|").map(part => part.trim()).filter(part => part.length > 0);
+    
     // Create object with headers as keys
     const userObj = {};
-    headers.forEach((header, index) => {
-      if (values[index]) {
+    headerParts.forEach((header, index) => {
+      if (values[index] !== undefined) {
         // Convert header to camelCase
         const key = header
           .toLowerCase()
@@ -55,7 +60,7 @@ const parseTableToJson = (tableArray) => {
     return userObj;
   });
 
-  return jsonResult;
+  return jsonResult.filter(obj => Object.keys(obj).length > 0);
 };
 /**
  * @route POST /api/user/add
