@@ -6,7 +6,7 @@ echo "=================================================="
 
 # Start the server in background
 echo "📡 Starting CloudPanel API server..."
-cd /Users/imf/Desktop/cloudpanel-api-node
+cd /Users/imf/Desktop/cloudpanel-api
 npm start > /dev/null 2>&1 &
 SERVER_PID=$!
 
