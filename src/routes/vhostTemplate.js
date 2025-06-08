@@ -29,13 +29,9 @@ const parseTableToJson = (tableArray) => {
 
   // Parse each data row
   const jsonResult = dataRows.map((row) => {
-    const dataRegex = /\|\s*([^|]*?)\s*\|/g;
-    const values = [];
-    let dataMatch;
-    while ((dataMatch = dataRegex.exec(row)) !== null) {
-      values.push(dataMatch[1].trim());
-    }
-
+    // Split by | and clean up values
+    const parts = row.split('|').map(part => part.trim()).filter(part => part !== '');
+    
     // Create object with headers as keys
     const templateObj = {};
     headers.forEach((header, index) => {
@@ -46,7 +42,10 @@ const parseTableToJson = (tableArray) => {
         .replace(/\s+/g, " ")
         .trim()
         .replace(/\s(.)/g, (match, letter) => letter.toUpperCase());
-      templateObj[key] = values[index] || "";
+      
+      // Handle empty values properly
+      const value = parts[index] || "";
+      templateObj[key] = value === "" ? null : value;
     });
 
     return templateObj;
