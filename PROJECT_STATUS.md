@@ -123,8 +123,8 @@ A comprehensive Node.js API wrapper for CloudPanel CLI commands, providing RESTf
 ### Quick Start
 ```bash
 # Clone and setup
-git clone <repo-url>
-cd cloudpanel-api-node
+git clone https://github.com/iamfafakkk/cloudpanel-api.git
+cd cloudpanel-api
 npm install
 npm start
 

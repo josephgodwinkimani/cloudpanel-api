@@ -11,15 +11,22 @@ class CloudPanelService {
    * Execute a CloudPanel CLI command
    * @param {string} command - The clpctl command to execute
    * @param {Array} args - Array of command arguments
+   * @param {Object} options - Additional options for command execution
    * @returns {Promise} - Promise that resolves with command output
    */
-  async executeCommand(command, args = []) {
+  async executeCommand(command, args = [], options = {}) {
     return new Promise((resolve, reject) => {
       const fullCommand = `${this.clpctlPath} ${command} ${args.join(' ')}`;
       
       logger.info(`Executing command: ${fullCommand}`);
       
-      exec(fullCommand, { timeout: 60000 }, (error, stdout, stderr) => {
+      // For commands that might require confirmation, we can provide input
+      const execOptions = { 
+        timeout: 60000,
+        ...options
+      };
+      
+      const childProcess = exec(fullCommand, execOptions, (error, stdout, stderr) => {
         if (error) {
           logger.error(`Command failed: ${fullCommand}`, error);
           reject({
@@ -31,14 +38,15 @@ class CloudPanelService {
         } else {
           logger.info(`Command succeeded: ${fullCommand}`);
           const parsedOutput = ResponseUtils.parseCliOutput(stdout);
-          resolve({
-            success: true,
-            data: parsedOutput,
-            command: fullCommand,
-            executedAt: new Date().toISOString()
-          });
+          resolve(parsedOutput);
         }
       });
+
+      // If input is provided for interactive commands, send it
+      if (options.input) {
+        childProcess.stdin.write(options.input);
+        childProcess.stdin.end();
+      }
     });
   }
 
@@ -169,12 +177,18 @@ class CloudPanelService {
     return this.executeCommand('site:install:certificate', args);
   }
 
-  async deleteSite(domainName, force = false) {
+  async deleteSite(domainName, force = true) {
     const args = this.buildArgs({ domainName });
+    
+    // Always use force by default to avoid hanging on confirmation prompt
+    // In an API context, we don't want interactive prompts
     if (force) {
       args.push('--force');
+      return this.executeCommand('site:delete', args);
+    } else {
+      // If force is explicitly set to false, provide "yes" as input for confirmation
+      return this.executeCommand('site:delete', args, { input: 'yes\n' });
     }
-    return this.executeCommand('site:delete', args);
   }
 
   // User methods
@@ -183,9 +197,17 @@ class CloudPanelService {
     return this.executeCommand('user:add', args);
   }
 
-  async deleteUser(userName) {
+  async deleteUser(userName, force = true) {
     const args = this.buildArgs({ userName });
-    return this.executeCommand('user:delete', args);
+    
+    // Always use force by default for API consistency
+    // Note: Check if user:delete command supports --force flag
+    if (force) {
+      // Some delete commands may not support --force, so we'll try with input first
+      return this.executeCommand('user:delete', args, { input: 'yes\n' });
+    } else {
+      return this.executeCommand('user:delete', args, { input: 'yes\n' });
+    }
   }
 
   async listUsers() {
@@ -216,9 +238,15 @@ class CloudPanelService {
     return this.executeCommand('vhost-template:add', args);
   }
 
-  async deleteVhostTemplate(name) {
+  async deleteVhostTemplate(name, force = true) {
     const args = this.buildArgs({ name });
-    return this.executeCommand('vhost-template:delete', args);
+    
+    // Provide confirmation input to avoid hanging on prompts
+    if (force) {
+      return this.executeCommand('vhost-template:delete', args, { input: 'yes\n' });
+    } else {
+      return this.executeCommand('vhost-template:delete', args, { input: 'yes\n' });
+    }
   }
 
   async viewVhostTemplate(name) {

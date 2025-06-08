@@ -1,24 +1,343 @@
 # CloudPanel API Node.js
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-iamfafakkk/cloudpanel--api-blue)](https://github.com/iamfafakkk/cloudpanel-api.git)
 
 A comprehensive Node.js API wrapper for CloudPanel CLI commands. This RESTful API provides programmatic access to all CloudPanel server management operations, making it easy to integrate CloudPanel functionality into your applications and automation workflows.
+
+## 🚀 Automated Deployment with PM2
+
+The project includes a comprehensive deployment script (`deploy.sh`) that automates the entire deployment process using PM2 process manager with advanced features for production environments.
+
+### 📦 Deployment Features
+
+- ✅ **Automated Git Integration** - Clone or update from repository
+- ✅ **Node.js Management** - Automatic installation via NVM (Node.js 22+)
+- ✅ **PM2 Process Management** - Clustering and zero-downtime deployments
+- ✅ **Interactive Configuration** - Port and API key setup with validation
+- ✅ **Backup & Rollback** - Automatic backup creation and rollback on failure
+- ✅ **Health Monitoring** - Built-in health checks and status monitoring
+- ✅ **Prerequisites Validation** - Automatic dependency checking and installation
+- ✅ **Root Privilege Management** - Designed for secure root deployment
+
+### 🔧 Quick Deployment
+
+#### One-Command Production Deployment
+
+```bash
+# Download and run deployment script
+curl -o deploy.sh https://raw.githubusercontent.com/iamfafakkk/cloudpanel-api/main/deploy.sh
+chmod +x deploy.sh
+
+# Run full deployment (requires root)
+sudo ./deploy.sh
+```
+
+#### Available Deployment Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `(no args)` | Full deployment process | `sudo ./deploy.sh` |
+| `start` | Start the application | `sudo ./deploy.sh start` |
+| `stop` | Stop the application | `sudo ./deploy.sh stop` |
+| `restart` | Restart the application | `sudo ./deploy.sh restart` |
+| `reload` | Zero-downtime reload | `sudo ./deploy.sh reload` |
+| `update` | Update from Git and reload | `sudo ./deploy.sh update` |
+| `logs` | Show application logs | `sudo ./deploy.sh logs` |
+| `status` | Show PM2 status | `sudo ./deploy.sh status` |
+| `health` | Check application health | `sudo ./deploy.sh health` |
+| `backup` | Create manual backup | `sudo ./deploy.sh backup` |
+| `help` | Show help message | `sudo ./deploy.sh help` |
+
+### 🏗️ Deployment Architecture
+
+#### Directory Structure
+```
+/root/cloudpanel-api/          # Main application directory
+├── src/                       # Source code
+├── logs/                      # Application logs
+├── node_modules/              # Dependencies
+├── .env                       # Environment configuration
+├── ecosystem.config.js        # PM2 configuration
+└── package.json               # Project metadata
+
+/root/backup/cloudpanel-api/   # Backup directory
+├── cloudpanel-api-backup-20250608_120000.tar.gz
+├── cloudpanel-api-backup-20250608_110000.tar.gz
+└── ... (keeps last 10 backups)
+```
+
+#### PM2 Configuration
+The script generates an optimized PM2 ecosystem configuration:
+
+```javascript
+module.exports = {
+  apps: [{
+    name: 'cloudpanel-api',
+    script: 'src/index.js',
+    instances: 'max',              // Use all CPU cores
+    exec_mode: 'cluster',          // Cluster mode for scalability
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    error_file: 'logs/pm2-error.log',
+    out_file: 'logs/pm2-out.log',
+    log_file: 'logs/pm2-combined.log',
+    time: true,                    // Add timestamps to logs
+    max_memory_restart: '1G',      // Restart if memory exceeds 1GB
+    node_args: '--max-old-space-size=1024',
+    watch: false,                  // Disable file watching in production
+    restart_delay: 1000,           // Delay between restarts
+    max_restarts: 10,              // Maximum restart attempts
+    min_uptime: '10s',             // Minimum uptime before considering stable
+    kill_timeout: 5000,            // Time to wait before killing process
+    wait_ready: true,              // Wait for ready signal
+    listen_timeout: 3000           // Timeout for listen event
+  }]
+}
+```
+
+### ⚙️ Interactive Environment Configuration
+
+The deployment script provides interactive configuration for critical settings:
+
+#### Port Configuration
+- Validates port range (1-65535)
+- Checks if port is already in use
+- Allows overriding port conflicts with confirmation
+
+#### API Key Configuration
+Three options available:
+1. **Auto-generate** - Creates secure 64-character random API key
+2. **Manual entry** - Enter custom API key
+3. **Keep existing** - Retain current API key (if available)
+
+#### Configuration Example
+```bash
+=== Environment Configuration ===
+Please provide the following configuration values:
+
+Current configuration:
+Port: 3000
+API Key: not configured
+
+Enter the application port (current: 3000): 8080
+API Key options:
+1. Generate a secure random API key (recommended)
+2. Enter your own API key
+Choose an option (1-2): 1
+Generated API key: a1b2c3d4e5f6...
+
+=== Configuration Summary ===
+Port: 8080
+API Key: a1b2c3d4... (truncated for security)
+
+Proceed with this configuration? (Y/n): Y
+```
+
+### 🔄 Deployment Workflow
+
+```mermaid
+graph TD
+    A[Start Deployment] --> B[Check Root Privileges]
+    B --> C[Check Prerequisites]
+    C --> D[Install/Validate Node.js via NVM]
+    D --> E[Clone/Update Git Repository]
+    E --> F[Create Directories]
+    F --> G[Backup Current Deployment]
+    G --> H[Stop Existing PM2 Process]
+    H --> I[Install Dependencies]
+    I --> J[Setup Environment]
+    J --> K[Create PM2 Configuration]
+    K --> L[Start Application]
+    L --> M[Health Check]
+    M --> N{Health Check Passed?}
+    N -->|Yes| O[Setup PM2 Startup]
+    N -->|No| P[Rollback]
+    O --> Q[Cleanup Old Backups]
+    Q --> R[Show Deployment Info]
+    R --> S[Deployment Complete]
+    P --> T[Deployment Failed]
+```
+
+### 🛡️ Error Handling & Rollback
+
+#### Automatic Rollback
+The script implements automatic rollback on deployment failure:
+
+1. **Error Detection** - Uses `trap 'rollback' ERR` to catch failures
+2. **Process Cleanup** - Stops failed PM2 processes
+3. **Backup Restoration** - Restores from latest backup
+4. **Service Recovery** - Restarts application with previous version
+
+#### Backup Management
+- **Automatic Backups** - Created before each deployment
+- **Retention Policy** - Keeps last 10 backups automatically
+- **Manual Backups** - Available via `sudo ./deploy.sh backup`
+- **Backup Contents** - Excludes node_modules, logs, and .git directories
+
+### 🔍 Health Monitoring
+
+#### Health Check Process
+```bash
+# Automatic health check after deployment
+curl -sf "http://localhost:$PORT/health"
+
+# Manual health check
+sudo ./deploy.sh health
+```
+
+#### Health Check Features
+- **Multiple Attempts** - 30 attempts with 2-second intervals
+- **Timeout Handling** - 60-second total timeout
+- **Failure Logging** - Shows PM2 logs on failure
+- **Status Reporting** - Clear success/failure indication
+
+### 🔧 PM2 Management Commands
+
+```bash
+# Process Management
+pm2 list                    # Show all processes
+pm2 start cloudpanel-api    # Start application
+pm2 stop cloudpanel-api     # Stop application
+pm2 restart cloudpanel-api  # Restart application
+pm2 reload cloudpanel-api   # Zero-downtime reload
+pm2 delete cloudpanel-api   # Delete process
+
+# Monitoring
+pm2 logs cloudpanel-api     # Show logs
+pm2 monit                   # Real-time monitoring
+pm2 show cloudpanel-api     # Detailed process info
+
+# Configuration
+pm2 save                    # Save current process list
+pm2 startup                 # Generate startup script
+pm2 unstartup               # Remove startup script
+```
+
+### 🚨 Troubleshooting Deployment
+
+#### Common Issues and Solutions
+
+##### 1. Permission Denied
+```bash
+Error: This script must be run as root
+Solution: Use sudo ./deploy.sh
+```
+
+##### 2. Node.js Version Issues
+```bash
+Error: Node.js version below required version 22
+Solution: Script automatically installs Node.js 22 via NVM
+```
+
+##### 3. Port Already in Use
+```bash
+Warning: Port 3000 is currently in use
+Solution: Choose different port or confirm override
+```
+
+##### 4. Git Repository Issues
+```bash
+Error: Git clone/pull failed
+Solution: Check repository URL and network connectivity
+```
+
+##### 5. Health Check Failures
+```bash
+Error: Health check failed after 30 attempts
+Solution: Check application logs via pm2 logs cloudpanel-api
+```
+
+#### Debug Commands
+```bash
+# Check PM2 status
+pm2 list
+
+# View detailed logs
+pm2 logs cloudpanel-api --lines 50
+
+# Monitor real-time
+pm2 monit
+
+# Check process details
+pm2 show cloudpanel-api
+
+# Restart with verbose logging
+NODE_ENV=development pm2 restart cloudpanel-api
+```
+
+### 📋 Deployment Prerequisites
+
+The script automatically checks and installs the following dependencies:
+- Git
+- Node.js 22+ (installed via NVM)
+- npm
+- PM2
+- curl (for health checks)
+- CloudPanel CLI (optional, with warning if not found)
+
+### 🔐 Security Considerations
+
+#### Root Privileges
+- **Required for Deployment** - Script must run as root for `/root/` directory access
+- **Privilege Validation** - Checks for root privileges before execution
+- **Secure Defaults** - API key auto-generation uses secure random methods
+
+#### API Key Security
+```bash
+# Auto-generation methods (in order of preference):
+1. openssl rand -hex 32          # 64-character hex string
+2. /dev/urandom + tr             # Fallback method
+
+# Security features:
+- Truncated display in logs (first 8 characters only)
+- No echo during manual entry
+- Validation for empty keys
+```
+
+### 🔄 Continuous Deployment
+
+#### CI/CD Integration Example
+```yaml
+# Example GitHub Actions workflow
+name: Deploy CloudPanel API
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        run: |
+          ssh root@your-server "cd /root/cloudpanel-api && ./deploy.sh update"
+```
+
+#### Automated Updates
+```bash
+# Set up automatic updates (optional)
+# Add to crontab for daily updates
+0 2 * * * /root/cloudpanel-api/deploy.sh update >> /var/log/cloudpanel-api-update.log 2>&1
+```
+
+---
 
 ## ✨ Features
 
 - 🌐 **Cloudflare Management**: Update and sync IP addresses
 - 🔐 **CloudPanel Security**: Enable/disable basic authentication
-- 🗄️ **Database Operations**: Complete CRUD operations, import/export, credentials management
-- 🔒 **SSL Certificates**: Automated Let's Encrypt certificate installation
-- 🌍 **Site Management**: Support for Node.js, PHP, Python, Static, and Reverse Proxy sites
-- 👤 **User Management**: User operations with MFA support
-- 📄 **Vhost Templates**: Complete template management system
-- 🛡️ **Security**: API key authentication, rate limiting, input validation
-- 📊 **Monitoring**: Built-in health checks and performance metrics
-- 🐳 **Docker Ready**: Complete containerization support
-- 📚 **Comprehensive Documentation**: Examples, deployment guides, and API docs
+- 🗄️ **Database Operations**: Create, import, export, and manage databases
+- 🔒 **SSL/TLS Certificates**: Install Let's Encrypt and custom certificates
+- 🌍 **Site Management**: Deploy Node.js, PHP, Python, static sites, and reverse proxies
+- 👥 **User Administration**: Complete user lifecycle management
+- 📋 **Vhost Templates**: Custom template management and deployment
+- ⚡ **Smart Confirmation Handling**: Automatic handling of CLI confirmation prompts (no more hanging commands!)
+- 🔄 **Force Mode Support**: Optional force mode for deletion operations
+- 🚀 **Production Ready**: Built for automated deployment and CI/CD workflows
 
 ## 🚀 Quick Start
 
