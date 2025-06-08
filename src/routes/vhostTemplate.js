@@ -14,13 +14,11 @@ const parseTableToJson = (tableArray) => {
   const headerRow = tableArray.find((row) => row.includes("Name"));
   if (!headerRow) return [];
 
-  // Extract headers using regex
-  const headerRegex = /\|\s*([^|]+?)\s*\|/g;
-  const headers = [];
-  let headerMatch;
-  while ((headerMatch = headerRegex.exec(headerRow)) !== null) {
-    headers.push(headerMatch[1].trim());
-  }
+  // Extract headers by splitting on | and filtering
+  const headers = headerRow
+    .split('|')
+    .map(part => part.trim())
+    .filter(part => part !== '');
 
   // Find data rows (exclude separator rows with +, -, |)
   const dataRows = tableArray.filter(
@@ -32,6 +30,11 @@ const parseTableToJson = (tableArray) => {
     // Split by | and remove first and last empty elements
     const parts = row.split('|');
     const values = parts.slice(1, -1).map(part => part.trim());
+
+    // Ensure we have exactly the same number of values as headers
+    while (values.length < headers.length) {
+      values.push("");
+    }
 
     // Create object with headers as keys
     const templateObj = {};
