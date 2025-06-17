@@ -3,6 +3,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const session = require('express-session');
+const path = require('path');
 const logger = require('./utils/logger');
 const { 
   authenticateApiKey, 
@@ -19,12 +21,42 @@ const letsencryptRoutes = require('./routes/letsencrypt');
 const siteRoutes = require('./routes/site');
 const userRoutes = require('./routes/user');
 const vhostTemplateRoutes = require('./routes/vhostTemplate');
+const authRoutes = require('./routes/auth');
+const docsRoutes = require('./routes/docs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Set view engine and views directory
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '../views'));
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'cloudpanel-api-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  rolling: true, // Reset expiry on activity
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax'
+  }
+}));
+
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
 app.use(cors());
 
 // Request logging
@@ -145,6 +177,19 @@ app.use('/api/letsencrypt', letsencryptRoutes);
 app.use('/api/site', siteRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/vhost-templates', vhostTemplateRoutes);
+
+// Authentication and documentation routes
+app.use('/auth', authRoutes);
+app.use('/docs', docsRoutes);
+
+// Redirect root to login
+app.get('/', (req, res) => {
+  if (req.session.user) {
+    res.redirect('/docs');
+  } else {
+    res.redirect('/auth/login');
+  }
+});
 
 // Error handling middleware
 app.use(errorHandler);
