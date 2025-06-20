@@ -474,7 +474,7 @@ class CloudPanelService {
     // delete all folder and files in the sitePath
     const deleteCommand = `rm -rf ${sitePath}/* ${sitePath}/.* 2>/dev/null || true`;
     const command = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone "${repositoryUrl}" .'`;
-    
+
     return new Promise((resolve, reject) => {
       exec(command, { timeout: 120000 }, (error, stdout, stderr) => {
         if (error) {
@@ -519,21 +519,16 @@ class CloudPanelService {
       appDebug = "false",
     } = envSettings;
 
-    // Create the sed commands to update .env file
-    const envUpdates = [
-      `s/^APP_ENV=.*/APP_ENV=${appEnv}/`,
-      `s/^APP_DEBUG=.*/APP_DEBUG=${appDebug}/`,
-      `s/^APP_URL=.*/APP_URL=${appUrl}/`,
-      `s/^DB_HOST=.*/DB_HOST=${dbHost}/`,
-      `s/^DB_DATABASE=.*/DB_DATABASE=${dbDatabase}/`,
-      `s/^DB_USERNAME=.*/DB_USERNAME=${dbUsername}/`,
-      `s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/`,
-    ];
-
-    const sedCommand = envUpdates
-      .map((update) => `sed -i '${update}'`)
-      .join(" && ");
-    const command = `sudo -u ${siteUser} bash -c 'cd /home/${siteUser}/htdocs/${domainName} && cp .env.example .env && ${sedCommand} .env && php artisan key:generate'`;
+    const command = `sudo -u ${siteUser} bash -c '
+cd /home/${siteUser}/htdocs/${domainName} &&
+cp .env.example .env &&
+sed -i "s/^APP_ENV=.*/APP_ENV=${appEnv}/" .env &&
+sed -i "s/^APP_DEBUG=.*/APP_DEBUG=${appDebug}/" .env &&
+sed -i "s|^APP_URL=.*|APP_URL=${appUrl}|" .env &&
+sed -i "s/^DB_HOST=.*/DB_HOST=${dbHost}/" .env &&
+sed -i "s/^DB_DATABASE=.*/DB_DATABASE=${dbDatabase}/" .env &&
+sed -i "s/^DB_USERNAME=.*/DB_USERNAME=${dbUsername}/" .env &&
+sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
 
     return new Promise((resolve, reject) => {
       exec(command, { timeout: 60000 }, (error, stdout, stderr) => {
@@ -588,7 +583,7 @@ class CloudPanelService {
     // Install composer dependencies
     if (installComposer) {
       commands.push(
-        `${baseCommand} && composer install --optimize-autoloader --no-dev'`
+        `${baseCommand} && composer install --optimize-autoloader --no-dev && php artisan key:generate --force'`
       );
     }
 
