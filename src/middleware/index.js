@@ -8,19 +8,42 @@ const authenticateApiKey = (req, res, next) => {
   const apiKey = req.header('X-API-Key') || req.query.apiKey;
   const validApiKey = process.env.API_KEY;
 
+  // Log debugging information (without exposing actual keys)
+  logger.info(`API Key Authentication - Environment: ${process.env.NODE_ENV}`);
+  logger.info(`API Key present in request: ${!!apiKey}`);
+  logger.info(`Valid API Key configured: ${!!validApiKey}`);
+
   // Skip authentication in development if no API key is set
   if (process.env.NODE_ENV === 'development' && !validApiKey) {
+    logger.info('Skipping API key validation in development (no API key configured)');
     return next();
   }
 
-  if (!apiKey || apiKey !== validApiKey) {
-    logger.warn(`Unauthorized API access attempt from ${req.ip}`);
-    return res.status(401).json({
+  if (!validApiKey) {
+    logger.error('No API key configured in environment variables');
+    return res.status(500).json({
       success: false,
-      error: 'Unauthorized - Invalid or missing API key'
+      error: 'Server configuration error - API key not configured'
     });
   }
 
+  if (!apiKey) {
+    logger.warn(`Missing API key in request from ${req.ip}`);
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized - Missing API key. Please provide X-API-Key header or apiKey query parameter.'
+    });
+  }
+
+  if (apiKey !== validApiKey) {
+    logger.warn(`Invalid API key attempt from ${req.ip}`);
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized - Invalid API key'
+    });
+  }
+
+  logger.info(`Successful API key authentication from ${req.ip}`);
   next();
 };
 
