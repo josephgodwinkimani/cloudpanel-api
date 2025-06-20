@@ -489,7 +489,7 @@ module.exports = {
   apps: [{
     name: 'cloudpanel-api',
     script: 'src/index.js',
-    instances: 'max',
+    instances: '2',
     exec_mode: 'cluster',
     env: {
       NODE_ENV: 'production',
