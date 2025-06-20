@@ -469,9 +469,12 @@ class CloudPanelService {
 
     const sshCommand =
       "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
-    const command = `su - ${siteUser} -c 'cd /home/${siteUser}/htdocs/${domainName} && GIT_SSH_COMMAND="${sshCommand}" git clone ${repositoryUrl} .'`;
-    // const commandExample = `su - bill -c 'cd /home/bill/htdocs/bill.aksess.my.id && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git clone git@github.com:iamfafakkk/segamas.git .'`;
 
+    const sitePath = `/home/${siteUser}/htdocs/${domainName}`;
+    // delete all folder and files in the sitePath
+    const deleteCommand = `rm -rf ${sitePath}/* ${sitePath}/.* 2>/dev/null || true`;
+    const command = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone "${repositoryUrl}" .'`;
+    
     return new Promise((resolve, reject) => {
       exec(command, { timeout: 120000 }, (error, stdout, stderr) => {
         if (error) {
