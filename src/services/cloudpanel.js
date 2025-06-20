@@ -115,6 +115,7 @@ class CloudPanelService {
       databaseUserName,
       databaseUserPassword,
     });
+    // clpctl db:add --domainName=bill.aksess.my.id --databaseName=setup --databaseUserName=setup --databaseUserPassword='!secretPassword!'
     return this.executeCommand("db:add", args);
   }
 
@@ -312,6 +313,50 @@ class CloudPanelService {
     return this.executeCommand("vhost-template:view", args);
   }
 
+  async createSiteSetup(
+    domainName,
+    phpVersion,
+    vhostTemplate,
+    siteUser,
+    siteUserPassword
+  ) {
+    const createSiteCommand = [
+      "clpctl",
+      "site:add:php",
+      `--domainName=${domainName}`,
+      `--phpVersion=${phpVersion}`,
+      `--vhostTemplate="${vhostTemplate}"`, // Pastikan ada quotes untuk template dengan spasi
+      `--siteUser=${siteUser}`,
+      `--siteUserPassword="${siteUserPassword}"`, // Pastikan password di-quote jika ada karakter khusus
+    ].join(" ");
+
+    return new Promise((resolve, reject) => {
+      exec(createSiteCommand, { timeout: 120000 }, (error, stdout, stderr) => {
+        if (error) {
+          logger.error(`Site creation failed for ${domainName}:`, error);
+          reject({
+            success: false,
+            error: ResponseUtils.formatError({
+              error: error.message,
+              stderr,
+            }),
+            command: createSiteCommand,
+            exitCode: error.code,
+          });
+        } else {
+          logger.info(`Site created successfully for ${domainName}`);
+          resolve({
+            success: true,
+            message: `Site created successfully for ${domainName}`,
+            output: stdout,
+            command: createSiteCommand,
+          });
+        }
+      });
+    });
+  }
+
+  
   async copySshKeysToUser(siteUser) {
     // Create SSH directory and copy keys from root to site user
     const commands = [
