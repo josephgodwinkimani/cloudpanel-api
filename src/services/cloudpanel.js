@@ -64,9 +64,20 @@ class CloudPanelService {
    */
   buildArgs(params) {
     const args = [];
+    // Parameters that need to be wrapped in single quotes
+    const quotedParams = [
+      "siteUserPassword",
+      "databaseUserPassword",
+      "vhostTemplate",
+    ];
+
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null) {
-        args.push(`--${key}=${value}`);
+        if (quotedParams.includes(key)) {
+          args.push(`--${key}='${value}'`);
+        } else {
+          args.push(`--${key}=${value}`);
+        }
       }
     }
     return args;
@@ -349,8 +360,9 @@ class CloudPanelService {
    */
   async cloneRepository(domainName, repositoryUrl, siteUser) {
     // rm -rf .[^.]* 2>/dev/null
-    
-    const sshCommand = 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null';
+
+    const sshCommand =
+      "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
     const command = `su - ${siteUser} -c 'cd /home/${siteUser}/htdocs/${domainName} && GIT_SSH_COMMAND="${sshCommand}" git clone ${repositoryUrl} .'`;
     // const commandExample = `su - bill -c 'cd /home/bill/htdocs/bill.aksess.my.id && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git clone git@github.com:iamfafakkk/segamas.git .'`;
 
