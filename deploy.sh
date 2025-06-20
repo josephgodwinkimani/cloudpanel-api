@@ -476,6 +476,14 @@ create_pm2_config() {
     # Get the current port from .env file
     local config_port=$(grep "^PORT=" .env 2>/dev/null | cut -d'=' -f2 || echo "3000")
     
+    # Get the current API key from .env file
+    local config_api_key=$(grep "^API_KEY=" .env 2>/dev/null | cut -d'=' -f2 || echo "")
+    
+    if [[ -z "$config_api_key" ]]; then
+        error "API_KEY not found in .env file. Please run setup first."
+        return 1
+    fi
+    
     cat > ecosystem.config.js << EOF
 module.exports = {
   apps: [{
@@ -485,11 +493,13 @@ module.exports = {
     exec_mode: 'cluster',
     env: {
       NODE_ENV: 'production',
-      PORT: ${config_port}
+      PORT: ${config_port},
+      API_KEY: '${config_api_key}'
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: ${config_port}
+      PORT: ${config_port},
+      API_KEY: '${config_api_key}'
     },
     error_file: 'logs/pm2-error.log',
     out_file: 'logs/pm2-out.log',
@@ -513,7 +523,7 @@ module.exports = {
 }
 EOF
     
-    success "PM2 ecosystem configuration created with port $config_port"
+    success "PM2 ecosystem configuration created with port $config_port and API key"
 }
 
 # Backup current deployment
