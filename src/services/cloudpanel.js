@@ -313,6 +313,14 @@ class CloudPanelService {
     return this.executeCommand("vhost-template:view", args);
   }
 
+  /**   * Create a site setup with PHP
+   * @param {string} domainName - The domain name for the site
+   * @param {string} phpVersion - The PHP version to use
+   * @param {string} vhostTemplate - The vhost template to use
+   * @param {string} siteUser - The user for the site
+   * @param {string} siteUserPassword - The password for the site user
+   * @returns {Promise} - Promise that resolves with command output
+   */
   async createSiteSetup(
     domainName,
     phpVersion,
@@ -356,7 +364,60 @@ class CloudPanelService {
     });
   }
 
-  
+  /**
+   * Create a database setup for a given domain
+   * @param {string} domainName - The domain name for the site
+   * @param {string} databaseName - The name of the database to create
+   * @param {string} databaseUserName - The username for the database user
+   * @param {string} databaseUserPassword - The password for the database user
+   * @returns {Promise} - Promise that resolves with command output
+   */
+  async createDatabaseSetup(
+    domainName,
+    databaseName,
+    databaseUserName,
+    databaseUserPassword
+  ) {
+    const createDbCommand = [
+      "clpctl",
+      "db:add",
+      `--domainName=${domainName}`,
+      `--databaseName=${databaseName}`,
+      `--databaseUserName=${databaseUserName}`,
+      `--databaseUserPassword="${databaseUserPassword}"`, // Ensure password is quoted
+    ].join(" ");
+
+    return new Promise((resolve, reject) => {
+      exec(createDbCommand, { timeout: 120000 }, (error, stdout, stderr) => {
+        if (error) {
+          logger.error(`Database creation failed for ${domainName}:`, error);
+          reject({
+            success: false,
+            error: ResponseUtils.formatError({
+              error: error.message,
+              stderr,
+            }),
+            command: createDbCommand,
+            exitCode: error.code,
+          });
+        } else {
+          logger.info(`Database created successfully for ${domainName}`);
+          resolve({
+            success: true,
+            message: `Database created successfully for ${domainName}`,
+            output: stdout,
+            command: createDbCommand,
+          });
+        }
+      });
+    });
+  }
+
+  /**
+   * Copy SSH keys from root to the specified site user
+   * @param {string} siteUser - The user to copy SSH keys to
+   * @returns {Promise} - Promise that resolves with command output
+   */
   async copySshKeysToUser(siteUser) {
     // Create SSH directory and copy keys from root to site user
     const commands = [
