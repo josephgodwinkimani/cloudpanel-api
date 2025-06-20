@@ -30,7 +30,7 @@ router.post(
 
       // Step 1: Create PHP site with Laravel
       logger.info(`Creating PHP site with Laravel for ${domainName}`);
-      const siteResult = await cloudpanelService.addPhpSite(
+      const siteResult = await cloudpanelService.createSiteSetup(
         domainName,
         phpVersion,
         vhostTemplate,
@@ -39,7 +39,9 @@ router.post(
       );
 
       if (!siteResult.success) {
-        throw new Error(`Failed to create PHP site: ${siteResult.error || 'Unknown error'}`);
+        throw new Error(
+          `Failed to create PHP site: ${siteResult.error || "Unknown error"}`
+        );
       }
 
       logger.info(
@@ -57,13 +59,19 @@ router.post(
 
       if (!dbResult.success) {
         // If database creation fails, we should clean up the site that was created
-        logger.error(`Database creation failed, cleaning up site: ${domainName}`);
+        logger.error(
+          `Database creation failed, cleaning up site: ${domainName}`
+        );
         try {
           await cloudpanelService.deleteSite(domainName, true);
         } catch (cleanupError) {
-          logger.error(`Failed to cleanup site after database error: ${cleanupError.message}`);
+          logger.error(
+            `Failed to cleanup site after database error: ${cleanupError.message}`
+          );
         }
-        throw new Error(`Failed to create database: ${dbResult.error || 'Unknown error'}`);
+        throw new Error(
+          `Failed to create database: ${dbResult.error || "Unknown error"}`
+        );
       }
 
       logger.info(`Database created successfully: ${JSON.stringify(dbResult)}`);
@@ -71,10 +79,10 @@ router.post(
       // Step 3: Copy SSH keys to the site user
       logger.info(`Copying SSH keys to site user: ${siteUser}`);
       const sshResult = await cloudpanelService.copySshKeysToUser(siteUser);
-      
+
       if (!sshResult.success) {
         logger.error(`SSH key copy failed, but continuing with setup`);
-        logger.error(`SSH error: ${sshResult.error || 'Unknown error'}`);
+        logger.error(`SSH error: ${sshResult.error || "Unknown error"}`);
         // SSH key copy failure is not critical, so we continue but log the error
       }
 
@@ -84,13 +92,15 @@ router.post(
         logger.info(`Cloning repository for ${domainName}`);
         try {
           cloneResult = await cloudpanelService.cloneRepository(
-            domainName, 
-            req.body.repositoryUrl, 
+            domainName,
+            req.body.repositoryUrl,
             siteUser
           );
-          
+
           if (!cloneResult.success) {
-            logger.error(`Repository clone failed: ${cloneResult.error || 'Unknown error'}`);
+            logger.error(
+              `Repository clone failed: ${cloneResult.error || "Unknown error"}`
+            );
             // Repository clone failure is not critical for basic setup
           } else {
             logger.info(`Repository cloned successfully`);
@@ -107,13 +117,13 @@ router.post(
         logger.info(`Configuring Laravel .env for ${domainName}`);
         try {
           const envSettings = {
-            dbHost: 'localhost',
+            dbHost: "localhost",
             dbDatabase: databaseName,
             dbUsername: databaseUserName,
             dbPassword: databaseUserPassword,
             appUrl: `https://${domainName}`,
-            appEnv: 'production',
-            appDebug: 'false'
+            appEnv: "production",
+            appDebug: "false",
           };
 
           envResult = await cloudpanelService.configureLaravelEnv(
@@ -123,7 +133,11 @@ router.post(
           );
 
           if (!envResult.success) {
-            logger.error(`Laravel .env configuration failed: ${envResult.error || 'Unknown error'}`);
+            logger.error(
+              `Laravel .env configuration failed: ${
+                envResult.error || "Unknown error"
+              }`
+            );
           } else {
             logger.info(`Laravel .env configured successfully`);
           }
@@ -141,7 +155,7 @@ router.post(
             runMigrations: req.body.runMigrations !== false,
             runSeeders: req.body.runSeeders === true,
             optimizeCache: req.body.optimizeCache !== false,
-            installComposer: req.body.installComposer !== false
+            installComposer: req.body.installComposer !== false,
           };
 
           laravelSetupResult = await cloudpanelService.runLaravelSetup(
@@ -151,7 +165,11 @@ router.post(
           );
 
           if (!laravelSetupResult.success) {
-            logger.error(`Laravel setup commands failed: ${laravelSetupResult.error || 'Unknown error'}`);
+            logger.error(
+              `Laravel setup commands failed: ${
+                laravelSetupResult.error || "Unknown error"
+              }`
+            );
           } else {
             logger.info(`Laravel setup commands completed successfully`);
           }
@@ -164,10 +182,22 @@ router.post(
       const result = {
         site: siteResult,
         database: dbResult,
-        sshKeys: sshResult || { success: false, message: "SSH keys not copied" },
-        repository: cloneResult || { success: false, message: "No repository specified" },
-        environment: envResult || { success: false, message: "Laravel .env not configured" },
-        laravelSetup: laravelSetupResult || { success: false, message: "Laravel setup not run" },
+        sshKeys: sshResult || {
+          success: false,
+          message: "SSH keys not copied",
+        },
+        repository: cloneResult || {
+          success: false,
+          message: "No repository specified",
+        },
+        environment: envResult || {
+          success: false,
+          message: "Laravel .env not configured",
+        },
+        laravelSetup: laravelSetupResult || {
+          success: false,
+          message: "Laravel setup not run",
+        },
         setup: {
           domainName,
           phpVersion,
@@ -187,11 +217,12 @@ router.post(
       );
     } catch (error) {
       logger.error("Failed to setup Laravel site:", error);
-      
+
       // Provide more detailed error information
-      const errorMessage = error.message || "Unknown error occurred during setup";
+      const errorMessage =
+        error.message || "Unknown error occurred during setup";
       const errorDetails = error.error || error.stderr || null;
-      
+
       BaseController.sendError(
         res,
         "Failed to setup Laravel site",
