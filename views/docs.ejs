@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudPanel API Documentation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        .content {
+            padding: 30px;
+        }
+        .endpoint-group {
+            margin-bottom: 40px;
+        }
+        .endpoint-group h2 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .method {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+            margin-right: 15px;
+            min-width: 60px;
+            text-align: center;
+        }
+        .method.get { background: #28a745; color: white; }
+        .method.post { background: #007bff; color: white; }
+        .method.delete { background: #dc3545; color: white; }
+        .method.put { background: #ffc107; color: black; }
+        .path {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #333;
+            flex: 1;
+        }
+        .description {
+            margin-bottom: 15px;
+            color: #666;
+            font-style: italic;
+        }
+        .details {
+            display: none;
+            margin-top: 15px;
+            border-top: 1px solid #dee2e6;
+            padding-top: 15px;
+        }
+        .details.show {
+            display: block;
+        }
+        .toggle-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: auto;
+        }
+        .toggle-btn:hover {
+            background: #5a67d8;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .auth-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+        .logout {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .logout:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .param-table th,
+        .param-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .param-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .required {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .optional {
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="/auth/logout" class="logout">Logout</a>
+            <h1>CloudPanel API Documentation</h1>
+            <p>Complete API reference with examples for CloudPanel management</p>
+        </div>
+        
+        <div class="content">
+            <div class="auth-info">
+                <strong>🔐 Authentication Required:</strong> All API endpoints require API key authentication via the <code>X-API-Key</code> header.
+            </div>
+
+            <div class="endpoint-group">
+                <h2>🌩️ Cloudflare</h2>
+                
+                <div class="endpoint">
+                    <div class="endpoint-header">
+                        <span class="method post">POST</span>
+                        <span class="path">/api/cloudflare/update-ips</span>
+                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+                    </div>
+                    <div class="description">Update Cloudflare IP addresses in server configuration</div>
+                    
+                    <div class="details">
+                        <div class="section">
+                            <h4>Headers</h4>
+                            <div class="code-block">{
+  "Content-Type": "application/json",
+  "X-API-Key": "your-api-key-here"
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">{
+  "force": false,
+  "backup": true
+}</div>
+                            <table class="param-table">
+                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td>force</td><td>boolean</td><td class="optional">Optional</td><td>Force update even if IPs are current</td></tr>
+                                <tr><td>backup</td><td>boolean</td><td class="optional">Optional</td><td>Create backup before updating</td></tr>
+                            </table>
+                        </div>
+
+                        <div class="section">
+                            <h4>Response Example</h4>
+                            <div class="code-block">{
+  "success": true,
+  "message": "Cloudflare IPs updated successfully",
+  "data": {
+    "updated_ips": 15,
+    "backup_created": true,
+    "timestamp": "2025-06-17T12:00:00Z"
+  }
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>cURL Example</h4>
+                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/cloudflare/update-ips" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
+  -d '{
+    "force": false,
+    "backup": true
+  }'</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h2>☁️ Cloudpanel</h2>
+                
+                <div class="endpoint">
+                    <div class="endpoint-header">
+                        <span class="method post">POST</span>
+                        <span class="path">/api/cloudpanel/basic-auth/enable</span>
+                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+                    </div>
+                    <div class="description">Enable basic authentication for CloudPanel</div>
+                    
+                    <div class="details">
+                        <div class="section">
+                            <h4>Headers</h4>
+                            <div class="code-block">{
+  "Content-Type": "application/json",
+  "X-API-Key": "your-api-key-here"
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">{
+  "username": "admin",
+  "password": "secure-password-123",
+  "realm": "CloudPanel Admin Area"
+}</div>
+                            <table class="param-table">
+                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td>username</td><td>string</td><td class="required">Required</td><td>Username for basic auth</td></tr>
+                                <tr><td>password</td><td>string</td><td class="required">Required</td><td>Password for basic auth (min 8 chars)</td></tr>
+                                <tr><td>realm</td><td>string</td><td class="optional">Optional</td><td>Authentication realm description</td></tr>
+                            </table>
+                        </div>
+
+                        <div class="section">
+                            <h4>Response Example</h4>
+                            <div class="code-block">{
+  "success": true,
+  "message": "Basic authentication enabled successfully",
+  "data": {
+    "username": "admin",
+    "realm": "CloudPanel Admin Area",
+    "enabled_at": "2025-06-17T12:00:00Z"
+  }
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>cURL Example</h4>
+                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/cloudpanel/basic-auth/enable" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
+  -d '{
+    "username": "admin",
+    "password": "secure-password-123",
+    "realm": "CloudPanel Admin Area"
+  }'</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="endpoint">
+                    <div class="endpoint-header">
+                        <span class="method delete">DELETE</span>
+                        <span class="path">/api/cloudpanel/basic-auth/disable</span>
+                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+                    </div>
+                    <div class="description">Disable basic authentication for CloudPanel</div>
+                    
+                    <div class="details">
+                        <div class="section">
+                            <h4>Headers</h4>
+                            <div class="code-block">{
+  "X-API-Key": "your-api-key-here"
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">No body required</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Response Example</h4>
+                            <div class="code-block">{
+  "success": true,
+  "message": "Basic authentication disabled successfully",
+  "data": {
+    "disabled_at": "2025-06-17T12:00:00Z"
+  }
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>cURL Example</h4>
+                            <div class="code-block">curl -X DELETE "<%= baseUrl %>/api/cloudpanel/basic-auth/disable" \
+  -H "X-API-Key: your-api-key-here"</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h2>🗄️ Database</h2>
+                
+                <div class="endpoint">
+                    <div class="endpoint-header">
+                        <span class="method get">GET</span>
+                        <span class="path">/api/database/master-credentials</span>
+                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+                    </div>
+                    <div class="description">Retrieve master database credentials</div>
+                    
+                    <div class="details">
+                        <div class="section">
+                            <h4>Headers</h4>
+                            <div class="code-block">{
+  "X-API-Key": "your-api-key-here"
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Query Parameters</h4>
+                            <table class="param-table">
+                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td>format</td><td>string</td><td class="optional">Optional</td><td>Response format: json, plain (default: json)</td></tr>
+                                <tr><td>include_password</td><td>boolean</td><td class="optional">Optional</td><td>Include password in response (default: true)</td></tr>
+                            </table>
+                        </div>
+
+                        <div class="section">
+                            <h4>Response Example</h4>
+                            <div class="code-block">{
+  "success": true,
+  "data": {
+    "host": "localhost",
+    "port": 3306,
+    "username": "root",
+    "password": "master-db-password",
+    "connection_string": "mysql://root:master-db-password@localhost:3306"
+  }
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>cURL Example</h4>
+                            <div class="code-block">curl -X GET "<%= baseUrl %>/api/database/master-credentials?format=json" \
+  -H "X-API-Key: your-api-key-here"</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="endpoint">
+                    <div class="endpoint-header">
+                        <span class="method post">POST</span>
+                        <span class="path">/api/database/add</span>
+                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+                    </div>
+                    <div class="description">Create a new database with user</div>
+                    
+                    <div class="details">
+                        <div class="section">
+                            <h4>Headers</h4>
+                            <div class="code-block">{
+  "Content-Type": "application/json",
+  "X-API-Key": "your-api-key-here"
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">{
+  "database_name": "myapp_production",
+  "username": "myapp_user",
+  "password": "secure-db-password-123",
+  "host": "localhost",
+  "charset": "utf8mb4",
+  "collation": "utf8mb4_unicode_ci"
+}</div>
+                            <table class="param-table">
+                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td>database_name</td><td>string</td><td class="required">Required</td><td>Name of the database to create</td></tr>
+                                <tr><td>username</td><td>string</td><td class="required">Required</td><td>Database user to create</td></tr>
+                                <tr><td>password</td><td>string</td><td class="required">Required</td><td>Password for database user</td></tr>
+                                <tr><td>host</td><td>string</td><td class="optional">Optional</td><td>Host for user access (default: localhost)</td></tr>
+                                <tr><td>charset</td><td>string</td><td class="optional">Optional</td><td>Database charset (default: utf8mb4)</td></tr>
+                                <tr><td>collation</td><td>string</td><td class="optional">Optional</td><td>Database collation (default: utf8mb4_unicode_ci)</td></tr>
+                            </table>
+                        </div>
+
+                        <div class="section">
+                            <h4>Response Example</h4>
+                            <div class="code-block">{
+  "success": true,
+  "message": "Database and user created successfully",
+  "data": {
+    "database_name": "myapp_production",
+    "username": "myapp_user",
+    "host": "localhost",
+    "charset": "utf8mb4",
+    "collation": "utf8mb4_unicode_ci",
+    "connection_string": "mysql://myapp_user:secure-db-password-123@localhost:3306/myapp_production",
+    "created_at": "2025-06-17T12:00:00Z"
+  }
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>cURL Example</h4>
+                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/database/add" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
+  -d '{
+    "database_name": "myapp_production",
+    "username": "myapp_user",
+    "password": "secure-db-password-123"
+  }'</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h2>🔐 User Management</h2>
+                
+                <div class="endpoint">
+                    <div class="endpoint-header">
+                        <span class="method post">POST</span>
+                        <span class="path">/api/user/create</span>
+                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+                    </div>
+                    <div class="description">Create a new system user</div>
+                    
+                    <div class="details">
+                        <div class="section">
+                            <h4>Headers</h4>
+                            <div class="code-block">{
+  "Content-Type": "application/json",
+  "X-API-Key": "your-api-key-here"
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">{
+  "username": "newuser",
+  "password": "secure-password-123",
+  "group": "www-data",
+  "shell": "/bin/bash",
+  "home_directory": "/home/newuser",
+  "create_home": true
+}</div>
+                            <table class="param-table">
+                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td>username</td><td>string</td><td class="required">Required</td><td>System username</td></tr>
+                                <tr><td>password</td><td>string</td><td class="required">Required</td><td>User password</td></tr>
+                                <tr><td>group</td><td>string</td><td class="optional">Optional</td><td>Primary group (default: username)</td></tr>
+                                <tr><td>shell</td><td>string</td><td class="optional">Optional</td><td>User shell (default: /bin/bash)</td></tr>
+                                <tr><td>home_directory</td><td>string</td><td class="optional">Optional</td><td>Home directory path</td></tr>
+                                <tr><td>create_home</td><td>boolean</td><td class="optional">Optional</td><td>Create home directory (default: true)</td></tr>
+                            </table>
+                        </div>
+
+                        <div class="section">
+                            <h4>Response Example</h4>
+                            <div class="code-block">{
+  "success": true,
+  "message": "User created successfully",
+  "data": {
+    "username": "newuser",
+    "uid": 1001,
+    "gid": 1001,
+    "home_directory": "/home/newuser",
+    "shell": "/bin/bash",
+    "created_at": "2025-06-17T12:00:00Z"
+  }
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>cURL Example</h4>
+                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/user/create" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
+  -d '{
+    "username": "newuser",
+    "password": "secure-password-123",
+    "group": "www-data"
+  }'</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h2>🌐 Site Management</h2>
+                
+                <div class="endpoint">
+                    <div class="endpoint-header">
+                        <span class="method post">POST</span>
+                        <span class="path">/api/site/create</span>
+                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+                    </div>
+                    <div class="description">Create a new website/domain</div>
+                    
+                    <div class="details">
+                        <div class="section">
+                            <h4>Headers</h4>
+                            <div class="code-block">{
+  "Content-Type": "application/json",
+  "X-API-Key": "your-api-key-here"
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">{
+  "domain": "example.com",
+  "type": "php",
+  "php_version": "8.2",
+  "document_root": "/home/user/htdocs/example.com",
+  "owner": "user",
+  "ssl": true,
+  "aliases": ["www.example.com"]
+}</div>
+                            <table class="param-table">
+                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td>domain</td><td>string</td><td class="required">Required</td><td>Primary domain name</td></tr>
+                                <tr><td>type</td><td>string</td><td class="required">Required</td><td>Site type: php, static, nodejs, python</td></tr>
+                                <tr><td>php_version</td><td>string</td><td class="optional">Optional</td><td>PHP version (for PHP sites)</td></tr>
+                                <tr><td>document_root</td><td>string</td><td class="optional">Optional</td><td>Document root path</td></tr>
+                                <tr><td>owner</td><td>string</td><td class="required">Required</td><td>Site owner username</td></tr>
+                                <tr><td>ssl</td><td>boolean</td><td class="optional">Optional</td><td>Enable SSL (default: true)</td></tr>
+                                <tr><td>aliases</td><td>array</td><td class="optional">Optional</td><td>Domain aliases</td></tr>
+                            </table>
+                        </div>
+
+                        <div class="section">
+                            <h4>Response Example</h4>
+                            <div class="code-block">{
+  "success": true,
+  "message": "Site created successfully",
+  "data": {
+    "domain": "example.com",
+    "type": "php",
+    "php_version": "8.2",
+    "document_root": "/home/user/htdocs/example.com",
+    "owner": "user",
+    "ssl": true,
+    "aliases": ["www.example.com"],
+    "nginx_config": "/etc/nginx/sites-available/example.com",
+    "created_at": "2025-06-17T12:00:00Z"
+  }
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>cURL Example</h4>
+                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/site/create" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
+  -d '{
+    "domain": "example.com",
+    "type": "php",
+    "owner": "user"
+  }'</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h2>🔒 Let's Encrypt SSL</h2>
+                
+                <div class="endpoint">
+                    <div class="endpoint-header">
+                        <span class="method post">POST</span>
+                        <span class="path">/api/letsencrypt/install</span>
+                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+                    </div>
+                    <div class="description">Install SSL certificate from Let's Encrypt</div>
+                    
+                    <div class="details">
+                        <div class="section">
+                            <h4>Headers</h4>
+                            <div class="code-block">{
+  "Content-Type": "application/json",
+  "X-API-Key": "your-api-key-here"
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">{
+  "domain": "example.com",
+  "email": "admin@example.com",
+  "challenge_type": "http-01",
+  "force_renewal": false
+}</div>
+                            <table class="param-table">
+                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+                                <tr><td>domain</td><td>string</td><td class="required">Required</td><td>Domain for SSL certificate</td></tr>
+                                <tr><td>email</td><td>string</td><td class="required">Required</td><td>Email for Let's Encrypt registration</td></tr>
+                                <tr><td>challenge_type</td><td>string</td><td class="optional">Optional</td><td>Challenge type: http-01, dns-01</td></tr>
+                                <tr><td>force_renewal</td><td>boolean</td><td class="optional">Optional</td><td>Force certificate renewal</td></tr>
+                            </table>
+                        </div>
+
+                        <div class="section">
+                            <h4>Response Example</h4>
+                            <div class="code-block">{
+  "success": true,
+  "message": "SSL certificate installed successfully",
+  "data": {
+    "domain": "example.com",
+    "certificate_path": "/etc/letsencrypt/live/example.com/fullchain.pem",
+    "private_key_path": "/etc/letsencrypt/live/example.com/privkey.pem",
+    "expires_at": "2025-09-17T12:00:00Z",
+    "auto_renewal": true,
+    "installed_at": "2025-06-17T12:00:00Z"
+  }
+}</div>
+                        </div>
+
+                        <div class="section">
+                            <h4>cURL Example</h4>
+                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/letsencrypt/install" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
+  -d '{
+    "domain": "example.com",
+    "email": "admin@example.com"
+  }'</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle details functionality
+            const toggleButtons = document.querySelectorAll('.toggle-btn[data-toggle="details"]');
+            
+            toggleButtons.forEach(function(button) {
+                button.addEventListener('click', function() {
+                    const details = this.closest('.endpoint').querySelector('.details');
+                    const isShowing = details.classList.contains('show');
+                    
+                    if (isShowing) {
+                        details.classList.remove('show');
+                        this.textContent = 'Show Details';
+                    } else {
+                        details.classList.add('show');
+                        this.textContent = 'Hide Details';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
