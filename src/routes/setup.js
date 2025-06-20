@@ -50,7 +50,7 @@ router.post(
 
       // Step 2: Create database for the Laravel site
       logger.info(`Creating database for ${domainName}`);
-      const dbResult = await cloudpanelService.addDatabase(
+      const dbResult = await cloudpanelService.createDatabaseSetup(
         domainName,
         databaseName,
         databaseUserName,
