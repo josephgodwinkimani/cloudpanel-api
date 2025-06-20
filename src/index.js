@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const session = require('express-session');
 const path = require('path');
 const logger = require('./utils/logger');
+const SessionStore = require('./utils/sessionStore');
 const { 
   authenticateApiKey, 
   createRateLimit, 
@@ -28,60 +29,89 @@ const setupRoutes = require('./routes/setup');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Initialize session store
+const sessionStore = new SessionStore();
+
 // Set view engine and views directory
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
-// Session configuration
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'cloudpanel-api-secret-key-change-in-production',
-  resave: false,
-  saveUninitialized: false,
-  rolling: true, // Reset expiry on activity
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax'
-  }
-}));
+// Initialize session store and configure sessions
+async function initializeApp() {
+  await sessionStore.initialize();
+  
+  // Session configuration with proper store
+  app.use(session(sessionStore.getSessionConfig()));
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
+  // Security middleware
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrcAttr: ["'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
     },
-  },
-}));
-app.use(cors());
+  }));
+  app.use(cors());
 
-// Request logging
-app.use(requestLogger);
+  // Request logging
+  app.use(requestLogger);
 
-// Rate limiting
-const limiter = createRateLimit(
-  parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100
-);
-app.use('/api/', limiter);
+  // Rate limiting
+  const limiter = createRateLimit(
+    parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+    parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100
+  );
+  app.use('/api/', limiter);
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+  // Body parsing middleware
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true }));
 
-// API authentication (optional in development)
-app.use('/api/', authenticateApiKey);
+  // API authentication (optional in development)
+  app.use('/api/', authenticateApiKey);
 
-// Logging middleware
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path} - ${req.ip}`);
-  next();
-});
+  // Logging middleware
+  app.use((req, res, next) => {
+    logger.info(`${req.method} ${req.path} - ${req.ip}`);
+    next();
+  });
+
+  // API routes (these need session middleware)
+  app.use('/api/cloudflare', cloudflareRoutes);
+  app.use('/api/cloudpanel', cloudpanelRoutes);
+  app.use('/api/database', databaseRoutes);
+  app.use('/api/letsencrypt', letsencryptRoutes);
+  app.use('/api/site', siteRoutes);
+  app.use('/api/user', userRoutes);
+  app.use('/api/vhost-templates', vhostTemplateRoutes);
+  app.use('/api/setup', setupRoutes);
+
+  // Authentication and documentation routes
+  app.use('/auth', authRoutes);
+  app.use('/docs', docsRoutes);
+  app.use('/setup', setupRoutes);
+
+  // Redirect root to login
+  app.get('/', (req, res) => {
+    if (req.session && req.session.user) {
+      res.redirect('/docs');
+    } else {
+      res.redirect('/auth/login');
+    }
+  });
+
+  // Error handling middleware
+  app.use(errorHandler);
+
+  // 404 handler
+  app.use('*', (req, res) => {
+    res.status(404).json({ error: 'Endpoint not found' });
+  });
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -173,45 +203,31 @@ app.get('/api/docs', (req, res) => {
   });
 });
 
-// API routes
-app.use('/api/cloudflare', cloudflareRoutes);
-app.use('/api/cloudpanel', cloudpanelRoutes);
-app.use('/api/database', databaseRoutes);
-app.use('/api/letsencrypt', letsencryptRoutes);
-app.use('/api/site', siteRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/vhost-templates', vhostTemplateRoutes);
-app.use('/api/setup', setupRoutes);
-
-// Authentication and documentation routes
-app.use('/auth', authRoutes);
-app.use('/docs', docsRoutes);
-app.use('/setup', setupRoutes);
-
-// Redirect root to login
-app.get('/', (req, res) => {
-  if (req.session.user) {
-    res.redirect('/docs');
-  } else {
-    res.redirect('/auth/login');
-  }
-});
-
-// Error handling middleware
-app.use(errorHandler);
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
-});
-
 // Export app for testing
 module.exports = app;
 
+// Graceful shutdown handler
+process.on('SIGINT', async () => {
+  logger.info('Received SIGINT, shutting down gracefully...');
+  await sessionStore.close();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Received SIGTERM, shutting down gracefully...');
+  await sessionStore.close();
+  process.exit(0);
+});
+
 // Only start server if this file is run directly
 if (require.main === module) {
-  app.listen(PORT, () => {
-    logger.info(`CloudPanel API server running on port ${PORT}`);
-    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  initializeApp().then(() => {
+    app.listen(PORT, () => {
+      logger.info(`CloudPanel API server running on port ${PORT}`);
+      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+  }).catch((error) => {
+    logger.error('Failed to initialize application:', error);
+    process.exit(1);
   });
 }

@@ -20,4 +20,4 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Start the application
-require('./src/index');
+require('./src/index.js');
