@@ -23,6 +23,7 @@ const userRoutes = require('./routes/user');
 const vhostTemplateRoutes = require('./routes/vhostTemplate');
 const authRoutes = require('./routes/auth');
 const docsRoutes = require('./routes/docs');
+const setupRoutes = require('./routes/setup');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -164,6 +165,9 @@ app.get('/api/docs', (req, res) => {
         'POST /api/vhost-templates/add': 'Add template',
         'DELETE /api/vhost-templates/delete': 'Delete template',
         'GET /api/vhost-templates/view/:name': 'View template'
+      },
+      setup: {
+        'POST /api/setup': 'Setup Laravel site with PHP and database'
       }
     }
   });
@@ -177,10 +181,12 @@ app.use('/api/letsencrypt', letsencryptRoutes);
 app.use('/api/site', siteRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/vhost-templates', vhostTemplateRoutes);
+app.use('/api/setup', setupRoutes);
 
 // Authentication and documentation routes
 app.use('/auth', authRoutes);
 app.use('/docs', docsRoutes);
+app.use('/setup', setupRoutes);
 
 // Redirect root to login
 app.get('/', (req, res) => {

@@ -335,6 +335,7 @@ jobs:
 - 🌍 **Site Management**: Deploy Node.js, PHP, Python, static sites, and reverse proxies
 - 👥 **User Administration**: Complete user lifecycle management
 - 📋 **Vhost Templates**: Custom template management and deployment
+- 🚧 **Laravel Setup**: One-click Laravel site creation with PHP and database setup
 - ⚡ **Smart Confirmation Handling**: Automatic handling of CLI confirmation prompts (no more hanging commands!)
 - 🔄 **Force Mode Support**: Optional force mode for deletion operations
 - 🚀 **Production Ready**: Built for automated deployment and CI/CD workflows
@@ -421,6 +422,11 @@ curl -H "X-API-Key: your-api-key" http://localhost:3000/api/endpoint
 | `POST` | `/site/add/static` | Create static website |
 | `POST` | `/site/add/reverse-proxy` | Create reverse proxy site |
 | `DELETE` | `/site/delete` | Delete existing site |
+
+### 🚧 Laravel Setup
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/setup` | One-click Laravel site creation with PHP and database setup |
 
 ### 👤 User Management
 | Method | Endpoint | Description |
