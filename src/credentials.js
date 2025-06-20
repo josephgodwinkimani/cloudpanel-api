@@ -8,16 +8,9 @@ const credentials = {
     {
       "id": 1,
       "username": "farrasfarras",
-      "password": "$2b$10$rDl2mjRcoF4eSO0HUYgppeTzHz1hwJRZo43WO.fz543UzREgyS7s6",
-      "createdAt": "2025-06-17T15:49:12.102Z",
-      "lastLogin": "2025-06-17T16:34:31.528Z"
-    },
-    {
-      "id": 2,
-      "username": "testuser",
-      "password": "$2b$10$FCrUi33a87eGIXO17n0CO./9Ee7x30wjNB/Fv1U7OcokEwp7ZDb4W",
-      "createdAt": "2025-06-17T16:20:58.325Z",
-      "lastLogin": "2025-06-17T16:33:24.381Z"
+      "password": "$2b$10$vxnGXf/mMDJ40bqdxbsTseaVexh34b8Qn7SK1RxtKo7ip3d33rAl2",
+      "createdAt": "2025-06-20T09:42:27.452Z",
+      "lastLogin": "2025-06-20T09:43:31.647Z"
     }
   ]
 };

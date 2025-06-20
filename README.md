@@ -27,7 +27,7 @@ The project includes a comprehensive deployment script (`deploy.sh`) that automa
 
 ```bash
 # Download and run deployment script
-curl -o deploy.sh https://raw.githubusercontent.com/iamfafakkk/cloudpanel-api/main/deploy.sh
+curl -o deploy.sh https://raw.githubusercontent.com/iamfafakkk/cloudpanel-api/main/deploy.sh?t=$(date +%s)
 chmod +x deploy.sh
 
 # Run full deployment (requires root)
@@ -510,16 +510,56 @@ CLPCTL_PATH=clpctl
 
 # Security (optional)
 API_KEY=your-secure-api-key-here
+SESSION_SECRET=your-secure-session-secret-here
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
+
+# Session Store (Redis for production)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+# REDIS_PASSWORD=your-redis-password
+# REDIS_URL=redis://localhost:6379
 
 # Logging
 LOG_LEVEL=info
 ```
 
+### Session Storage
+
+The application uses express-session for session management. For production environments, it automatically switches to Redis for session storage to avoid memory leaks and support multiple processes.
+
+#### Development (Memory Store)
+In development mode, sessions are stored in memory by default:
+```bash
+NODE_ENV=development  # Uses memory store (default)
+```
+
+#### Production (Redis Store)
+For production, configure Redis to store sessions:
+```bash
+# Option 1: Using Redis URL
+REDIS_URL=redis://localhost:6379
+
+# Option 2: Using individual settings
+REDIS_HOST=your-redis-host
+REDIS_PORT=6379
+REDIS_PASSWORD=your-redis-password  # Optional
+```
+
+#### Docker with Redis
+The included Docker Compose configuration automatically sets up Redis:
+```bash
+# Development with Redis
+docker-compose -f docker-compose.dev.yml up
+
+# Production with Redis
+docker-compose up -d
+```
+
 ### Security Features
 
 - **API Key Authentication**: Optional but recommended for production
+- **Session Management**: Redis-backed sessions for production scalability
 - **Rate Limiting**: Configurable request throttling
 - **Input Validation**: Joi schema validation for all endpoints
 - **Security Headers**: Helmet.js security middleware
