@@ -160,8 +160,13 @@ clone_or_update_project() {
         log "Git repository found. Updating from remote..."
         cd "$APP_DIR"
         
+        # Reset any local changes that might interfere
+        log "Resetting local changes..."
+        git reset --hard HEAD
+        git clean -fd
+        
         # Fetch latest changes
-        git fetch origin
+        git fetch origin --prune
         
         # Check if there are changes
         LOCAL=$(git rev-parse HEAD)
@@ -170,7 +175,13 @@ clone_or_update_project() {
         if [[ "$LOCAL" != "$REMOTE" ]]; then
             log "New changes detected. Pulling latest code..."
             git pull origin main 2>/dev/null || git pull origin master 2>/dev/null
-            success "Repository updated successfully"
+            
+            # Clear application cache files
+            log "Clearing application cache..."
+            rm -rf logs/*.log 2>/dev/null || true
+            rm -rf sessions/*.db 2>/dev/null || true
+            
+            success "Repository updated successfully with cache cleared"
         else
             log "Repository is already up to date"
         fi
@@ -220,13 +231,27 @@ install_dependencies() {
     # Ensure NVM is loaded
     load_nvm
     
-    if [[ -f package-lock.json ]]; then
-        npm ci --production
-    else
-        npm install --production
+    # Clear npm cache to prevent stale packages
+    log "Clearing npm cache..."
+    npm cache clean --force
+    
+    # Remove node_modules and package-lock.json to ensure fresh install
+    if [[ -d node_modules ]]; then
+        log "Removing existing node_modules..."
+        rm -rf node_modules
     fi
     
-    success "Dependencies installed"
+    # Remove package-lock.json to ensure fresh dependency resolution
+    if [[ -f package-lock.json ]]; then
+        log "Removing package-lock.json for fresh dependency resolution..."
+        rm -f package-lock.json
+    fi
+    
+    # Fresh install
+    log "Installing fresh dependencies..."
+    npm install --production --no-cache
+    
+    success "Dependencies installed fresh"
 }
 
 # Setup environment
@@ -527,7 +552,12 @@ stop_existing() {
         log "Stopping existing PM2 process..."
         pm2 stop "$APP_NAME" || true
         pm2 delete "$APP_NAME" || true
-        success "Existing process stopped"
+        
+        # Clear PM2 logs and cache
+        log "Clearing PM2 logs and cache..."
+        pm2 flush "$APP_NAME" 2>/dev/null || true
+        
+        success "Existing process stopped and cache cleared"
     else
         log "No existing PM2 process found"
     fi
@@ -605,6 +635,48 @@ cleanup_backups() {
         
         success "Old backups cleaned up"
     fi
+}
+
+# Clear all application caches
+clear_all_caches() {
+    log "Clearing all application caches..."
+    
+    # Ensure we're in the application directory
+    cd "$APP_DIR" 2>/dev/null || return 1
+    
+    # Clear npm cache
+    if command -v npm &> /dev/null; then
+        log "Clearing npm cache..."
+        npm cache clean --force 2>/dev/null || true
+    fi
+    
+    # Clear Node.js require cache by restarting
+    if command -v pm2 &> /dev/null; then
+        load_nvm
+        if pm2 list | grep -q "$APP_NAME"; then
+            log "Restarting application to clear require cache..."
+            pm2 restart "$APP_NAME" 2>/dev/null || true
+        fi
+    fi
+    
+    # Clear application logs (optional)
+    log "Clearing application logs..."
+    > logs/combined.log 2>/dev/null || true
+    > logs/error.log 2>/dev/null || true
+    
+    # Clear PM2 logs
+    if command -v pm2 &> /dev/null; then
+        load_nvm
+        pm2 flush "$APP_NAME" 2>/dev/null || true
+    fi
+    
+    # Clear sessions if they exist
+    if [[ -f sessions/sessions.db ]]; then
+        log "Clearing session cache..."
+        > sessions/sessions.db 2>/dev/null || true
+    fi
+    
+    success "All caches cleared"
 }
 
 # Show deployment information
@@ -735,16 +807,45 @@ case "${1:-}" in
     "backup")
         backup_current
         ;;
+    "cache")
+        clear_all_caches
+        ;;
     "update")
         log "Updating project from Git repository..."
-        clone_or_update_project
+        
+        # Stop the application first to prevent file locks
         load_nvm
+        if pm2 list | grep -q "$APP_NAME"; then
+            log "Stopping application for update..."
+            pm2 stop "$APP_NAME"
+        fi
+        
+        # Update project
+        clone_or_update_project
+        
+        # Force fresh dependency install
         install_dependencies
-        pm2 reload "$APP_NAME" 2>/dev/null || {
-            warning "Application not running. Starting fresh deployment..."
-            main
-        }
-        success "Project updated successfully"
+        
+        # Recreate PM2 config to ensure latest settings
+        create_pm2_config
+        
+        # Clear PM2 cache and restart fresh
+        log "Clearing PM2 cache..."
+        pm2 kill 2>/dev/null || true
+        sleep 2
+        
+        # Start application
+        pm2 start ecosystem.config.js --env production
+        pm2 save
+        
+        # Verify deployment
+        if health_check; then
+            success "Project updated and deployed successfully"
+        else
+            error "Update failed during health check"
+            rollback
+            exit 1
+        fi
         ;;
     "help"|"-h"|"--help")
         echo "CloudPanel API Deployment Script"
@@ -760,11 +861,12 @@ case "${1:-}" in
         echo "  stop       Stop the application"
         echo "  restart    Restart the application"
         echo "  reload     Zero-downtime reload"
-        echo "  update     Update project from Git and reload"
+        echo "  update     Update project from Git and reload (clears cache)"
         echo "  logs       Show application logs"
         echo "  status     Show PM2 status"
         echo "  health     Check application health"
         echo "  backup     Create backup"
+        echo "  cache      Clear all application caches"
         echo "  help       Show this help message"
         echo
         echo "Features:"
@@ -773,6 +875,7 @@ case "${1:-}" in
         echo "  - PM2 process management with clustering"
         echo "  - Automatic backup and rollback"
         echo "  - Health checks and monitoring"
+        echo "  - Cache clearing and dependency refresh"
         echo
         echo "Repository: $GIT_REPO"
         echo "Note: This script must be run as root (use sudo)"
