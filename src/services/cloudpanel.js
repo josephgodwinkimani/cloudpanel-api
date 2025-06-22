@@ -63,17 +63,19 @@ class CloudPanelService {
         const childProcess = exec(baseCommand, execOptions, (error, stdout, stderr) => {
           if (error) {
             logger.error(`Command failed: ${baseCommand}`, error);
+            
+            // Parse the error output to extract meaningful error messages
+            const output = stdout + stderr;
+            let parsedError = this.parseErrorMessage(output, error.message);
+            
             reject({
               success: false,
-              error: ResponseUtils.formatError({
-                error: error.message,
-                stderr,
-              }),
+              error: parsedError,
               command: baseCommand,
               exitCode: error.code,
               stdout: stdout,
               stderr: stderr,
-              fullOutput: stdout + stderr
+              fullOutput: output
             });
           } else {
             logger.info(`Command succeeded: ${baseCommand}`);
@@ -391,6 +393,119 @@ class CloudPanelService {
     return true;
   }
 
+  /**
+   * Parse error output to extract meaningful error messages
+   * @param {string} output - The combined stdout and stderr output
+   * @param {string} defaultError - Default error message if no pattern matches
+   * @returns {string} - Parsed error message
+   */
+  parseErrorMessage(output, defaultError = 'Command failed') {
+    // Check for specific error patterns
+    if (output.includes('This value already exists') || output.includes('already exists')) {
+      if (output.includes('domainName')) {
+        return 'domainName: This value already exists.';
+      } else if (output.includes('databaseName')) {
+        return 'databaseName: This value already exists.';
+      } else if (output.includes('databaseUserName')) {
+        return 'databaseUserName: This value already exists.';
+      } else if (output.includes('userName')) {
+        return 'userName: This value already exists.';
+      } else if (output.includes('siteUser')) {
+        return 'siteUser: This value already exists.';
+      } else {
+        // Extract the specific field from clpctl output
+        const lines = output.split('\n');
+        for (const line of lines) {
+          if (line.includes(': This value already exists') || line.includes(': already exists')) {
+            return line.trim();
+          }
+        }
+        return 'This value already exists.';
+      }
+    } else if (output.includes('Invalid PHP version')) {
+      return 'phpVersion: Invalid PHP version specified.';
+    } else if (output.includes('Template not found')) {
+      return 'vhostTemplate: Template not found.';
+    } else if (output.includes('Domain not found')) {
+      return 'domainName: Domain not found.';
+    } else if (output.includes('Invalid database name')) {
+      return 'databaseName: Invalid database name.';
+    } else if (output.includes('Invalid username')) {
+      return 'userName: Invalid username.';
+    } else if (output.toLowerCase().includes('error')) {
+      // Try to extract error message from output
+      const errorMatch = output.match(/error[:\s]+(.+?)[\n\r]/i);
+      if (errorMatch) {
+        return errorMatch[1].trim();
+      } else {
+        // Look for lines that contain error information
+        const lines = output.split('\n');
+        for (const line of lines) {
+          if (line.toLowerCase().includes('error') && line.trim()) {
+            return line.trim();
+          }
+        }
+      }
+    }
+    
+    // If no specific pattern matches, return the output or default error
+    return output.trim() || defaultError;
+  }
+
+  /**
+   * Handle SSH command execution result and format errors consistently
+   * @param {number} code - Exit code
+   * @param {string} stdout - Standard output
+   * @param {string} stderr - Standard error
+   * @param {string} command - The command that was executed
+   * @returns {Object} - Formatted result object
+   */
+  handleSshResult(code, stdout, stderr, command) {
+    const output = stdout + stderr;
+    const hasError = output.toLowerCase().includes('error') || 
+                   output.toLowerCase().includes('failed') ||
+                   output.includes('This value already exists') ||
+                   output.includes('already exists');
+    
+    if (code !== 0 || hasError) {
+      logger.error(`SSH command failed with code ${code}: ${command}`);
+      
+      const parsedError = this.parseErrorMessage(output, `Command failed with exit code ${code}`);
+      
+      return {
+        success: false,
+        error: parsedError,
+        command: command,
+        exitCode: code,
+        stdout: stdout,
+        stderr: stderr,
+        fullOutput: output
+      };
+    } else {
+      logger.info(`SSH command succeeded: ${command}`);
+      const result = {
+        success: true,
+        output: stdout || 'Command completed successfully',
+        stderr: stderr,
+        command: command,
+        exitCode: code
+      };
+      
+      // Try to parse CLI output if available
+      if (stdout) {
+        try {
+          const parsedOutput = ResponseUtils.parseCliOutput(stdout);
+          return parsedOutput;
+        } catch (parseError) {
+          // If parsing fails, return raw output
+          return result;
+        }
+      } else {
+        return result;
+      }
+    }
+  }
+
   // Cloudflare methods
   async updateCloudflareIps() {
     return this.executeCommand("cloudflare:update:ips");
@@ -695,18 +810,20 @@ class CloudPanelService {
         exec(baseCreateSiteCommand, { timeout: 120000 }, (error, stdout, stderr) => {
           if (error) {
             logger.error(`Site creation failed for ${domainName}:`, error);
+            
+            // Parse the error output to extract meaningful error messages
+            const output = stdout + stderr;
+            let parsedError = this.parseErrorMessage(output, error.message);
+            
             reject({
               success: false,
               message: `Site creation failed for ${domainName}`,
-              error: ResponseUtils.formatError({
-                error: error.message,
-                stderr,
-              }),
+              error: parsedError,
               command: baseCreateSiteCommand,
               exitCode: error.code,
               stdout: stdout,
               stderr: stderr,
-              fullOutput: stdout + stderr
+              fullOutput: output
             });
           } else {
             logger.info(`Site created successfully for ${domainName}`);
@@ -796,18 +913,20 @@ class CloudPanelService {
         exec(baseCreateDbCommand, { timeout: 120000 }, (error, stdout, stderr) => {
           if (error) {
             logger.error(`Database creation failed for ${domainName}:`, error);
+            
+            // Parse the error output to extract meaningful error messages
+            const output = stdout + stderr;
+            let parsedError = this.parseErrorMessage(output, error.message);
+            
             reject({
               success: false,
               message: `Database creation failed for ${domainName}`,
-              error: ResponseUtils.formatError({
-                error: error.message,
-                stderr,
-              }),
+              error: parsedError,
               command: baseCreateDbCommand,
               exitCode: error.code,
               stdout: stdout,
               stderr: stderr,
-              fullOutput: stdout + stderr
+              fullOutput: output
             });
           } else {
             logger.info(`Database created successfully for ${domainName}`);
