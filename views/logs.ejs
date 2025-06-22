@@ -144,6 +144,9 @@
                             <option value="Server Start">Server Start</option>
                             <option value="Validation">Validation</option>
                             <option value="Response">Response</option>
+                            <option value="Site Management">Site Management</option>
+                            <option value="SSL Certificate">SSL Certificate</option>
+                            <option value="Error">Error</option>
                         </select>
                         
                         <input 
@@ -177,7 +180,7 @@
                         </div>
                         
                         <div class="text-sm text-gray-500">
-                            Total logs: <span id="total-logs"><%= logs.length %></span>
+                            Total logs: <span id="total-logs"><%= pagination ? pagination.totalLogs : logs.length %></span>
                         </div>
                     </div>
                 </div>
@@ -193,7 +196,7 @@
                             </div>
                             <div class="ml-3 lg:ml-4">
                                 <h3 class="text-xs lg:text-sm font-medium text-gray-500">Total Logs</h3>
-                                <p class="text-lg lg:text-2xl font-semibold text-gray-900" id="stat-total"><%= logs.length %></p>
+                                <p class="text-lg lg:text-2xl font-semibold text-gray-900" id="stat-total"><%= pagination ? pagination.totalLogs : logs.length %></p>
                             </div>
                         </div>
                     </div>
@@ -262,6 +265,9 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Source
                                     </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="logs-table" class="bg-white divide-y divide-gray-200">
@@ -269,18 +275,28 @@
                                 <tr class="log-row hover:bg-gray-50" 
                                     data-level="<%= log.level %>" 
                                     data-type="<%= log.type %>" 
-                                    data-action="<%= log.action %>">
+                                    data-action="<%= log.action %>"
+                                    data-log-id="log-<%= index %>">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         <%= new Date(log.timestamp).toLocaleString() %>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <% 
                                         let levelClass = 'bg-gray-100 text-gray-800';
-                                        if (log.level === 'info') levelClass = 'bg-blue-100 text-blue-800';
-                                        else if (log.level === 'warning') levelClass = 'bg-yellow-100 text-yellow-800';
-                                        else if (log.level === 'error') levelClass = 'bg-red-100 text-red-800';
+                                        let levelIcon = '';
+                                        if (log.level === 'info') {
+                                            levelClass = 'bg-blue-100 text-blue-800';
+                                            levelIcon = '🔵';
+                                        } else if (log.level === 'warning') {
+                                            levelClass = 'bg-yellow-100 text-yellow-800';
+                                            levelIcon = '⚠️';
+                                        } else if (log.level === 'error') {
+                                            levelClass = 'bg-red-100 text-red-800';
+                                            levelIcon = '🔴';
+                                        }
                                         %>
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= levelClass %>">
+                                            <span class="mr-1"><%= levelIcon %></span>
                                             <%= log.level.toUpperCase() %>
                                         </span>
                                     </td>
@@ -289,17 +305,348 @@
                                             <%= log.action %>
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-gray-900 max-w-md truncate" title="<%= log.message %>">
-                                        <%= log.message %>
+                                    <td class="px-6 py-4 text-sm text-gray-900 max-w-md">
+                                        <div class="truncate" title="<%= log.message %>">
+                                            <% 
+                                            // Create more detailed messages based on log content
+                                            let detailedMessage = log.message;
+                                            if (log.action === 'Authentication') {
+                                                detailedMessage = `🔐 ${log.message} - User authentication process completed`;
+                                            } else if (log.action === 'API Request') {
+                                                detailedMessage = `🌐 ${log.message} - HTTP request processed by API server`;
+                                            } else if (log.action === 'Database') {
+                                                detailedMessage = `🗄️ ${log.message} - Database operation executed`;
+                                            } else if (log.action === 'CloudPanel') {
+                                                detailedMessage = `☁️ ${log.message} - CloudPanel management operation`;
+                                            } else if (log.action === 'Session') {
+                                                detailedMessage = `👤 ${log.message} - User session management`;
+                                            } else if (log.action === 'Server Start') {
+                                                detailedMessage = `🚀 ${log.message} - Server initialization and startup`;
+                                            } else if (log.action === 'Site Management') {
+                                                detailedMessage = `🌍 ${log.message} - Website management operation`;
+                                            } else if (log.action === 'SSL Certificate') {
+                                                detailedMessage = `🔒 ${log.message} - SSL certificate management`;
+                                            } else if (log.action === 'Error') {
+                                                detailedMessage = `❌ ${log.message} - System error occurred`;
+                                            }
+                                            %>
+                                            <%= detailedMessage %>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <%= log.source %>
+                                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-50 text-gray-600">
+                                            <%= log.source %>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button onclick="showLogDetail('<%= index %>')" class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-md transition-colors duration-200 text-xs font-medium">
+                                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            Detail
+                                        </button>
                                     </td>
                                 </tr>
+                                
+                                <!-- Hidden data for modal -->
+                                <script type="application/json" id="log-data-<%= index %>">
+                                {
+                                    "id": "<%= index %>",
+                                    "timestamp": "<%= log.timestamp %>",
+                                    "level": "<%= log.level %>",
+                                    "action": "<%= log.action %>",
+                                    "message": "<%= log.message.replace(/"/g, '\\"') %>",
+                                    "source": "<%= log.source %>",
+                                    "type": "<%= log.type %>",
+                                    "formattedTime": "<%= new Date(log.timestamp).toLocaleString() %>",
+                                    "metadata": {
+                                        "service": "cloudpanel-api",
+                                        "environment": "development",
+                                        "version": "1.0.0",
+                                        "ip": "127.0.0.1",
+                                        "userAgent": "CloudPanel API Server"
+                                    }
+                                }
+                                </script>
                                 <% }); %>
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                <!-- Pagination Controls -->
+                <% if (pagination && pagination.totalPages > 1) { %>
+                <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                    <div class="flex-1 flex justify-between sm:hidden">
+                        <% if (pagination.hasPrev) { %>
+                        <a href="/logs?page=<%= pagination.prevPage %>&level=<%= filters.level %>&type=<%= filters.type %>&action=<%= filters.action %>&search=<%= encodeURIComponent(filters.search) %>" 
+                           class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Previous
+                        </a>
+                        <% } else { %>
+                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-400 bg-gray-100 cursor-not-allowed">
+                            Previous
+                        </span>
+                        <% } %>
+                        
+                        <% if (pagination.hasNext) { %>
+                        <a href="/logs?page=<%= pagination.nextPage %>&level=<%= filters.level %>&type=<%= filters.type %>&action=<%= filters.action %>&search=<%= encodeURIComponent(filters.search) %>" 
+                           class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Next
+                        </a>
+                        <% } else { %>
+                        <span class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-400 bg-gray-100 cursor-not-allowed">
+                            Next
+                        </span>
+                        <% } %>
+                    </div>
+                    
+                    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm text-gray-700">
+                                Showing 
+                                <span class="font-medium"><%= ((pagination.currentPage - 1) * pagination.limit) + 1 %></span>
+                                to 
+                                <span class="font-medium">
+                                    <%= Math.min(pagination.currentPage * pagination.limit, pagination.totalLogs) %>
+                                </span>
+                                of 
+                                <span class="font-medium"><%= pagination.totalLogs %></span>
+                                results
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                <!-- Previous Button -->
+                                <% if (pagination.hasPrev) { %>
+                                <a href="/logs?page=<%= pagination.prevPage %>&level=<%= filters.level %>&type=<%= filters.type %>&action=<%= filters.action %>&search=<%= encodeURIComponent(filters.search) %>" 
+                                   class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    <span class="sr-only">Previous</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </a>
+                                <% } else { %>
+                                <span class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-gray-100 text-sm font-medium text-gray-400 cursor-not-allowed">
+                                    <span class="sr-only">Previous</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                                <% } %>
+                                
+                                <!-- Page Numbers -->
+                                <% 
+                                const startPage = Math.max(1, pagination.currentPage - 2);
+                                const endPage = Math.min(pagination.totalPages, pagination.currentPage + 2);
+                                %>
+                                
+                                <% if (startPage > 1) { %>
+                                <a href="/logs?page=1&level=<%= filters.level %>&type=<%= filters.type %>&action=<%= filters.action %>&search=<%= encodeURIComponent(filters.search) %>" 
+                                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    1
+                                </a>
+                                <% if (startPage > 2) { %>
+                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                    ...
+                                </span>
+                                <% } %>
+                                <% } %>
+                                
+                                <% for (let i = startPage; i <= endPage; i++) { %>
+                                <% if (i === pagination.currentPage) { %>
+                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
+                                    <%= i %>
+                                </span>
+                                <% } else { %>
+                                <a href="/logs?page=<%= i %>&level=<%= filters.level %>&type=<%= filters.type %>&action=<%= filters.action %>&search=<%= encodeURIComponent(filters.search) %>" 
+                                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    <%= i %>
+                                </a>
+                                <% } %>
+                                <% } %>
+                                
+                                <% if (endPage < pagination.totalPages) { %>
+                                <% if (endPage < pagination.totalPages - 1) { %>
+                                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                    ...
+                                </span>
+                                <% } %>
+                                <a href="/logs?page=<%= pagination.totalPages %>&level=<%= filters.level %>&type=<%= filters.type %>&action=<%= filters.action %>&search=<%= encodeURIComponent(filters.search) %>" 
+                                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    <%= pagination.totalPages %>
+                                </a>
+                                <% } %>
+                                
+                                <!-- Next Button -->
+                                <% if (pagination.hasNext) { %>
+                                <a href="/logs?page=<%= pagination.nextPage %>&level=<%= filters.level %>&type=<%= filters.type %>&action=<%= filters.action %>&search=<%= encodeURIComponent(filters.search) %>" 
+                                   class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    <span class="sr-only">Next</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </a>
+                                <% } else { %>
+                                <span class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-gray-100 text-sm font-medium text-gray-400 cursor-not-allowed">
+                                    <span class="sr-only">Next</span>
+                                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                                <% } %>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Detail Modal -->
+    <div id="logDetailModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <!-- Modal panel -->
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="w-full">
+                            <!-- Modal Header -->
+                            <div class="flex items-center justify-between mb-6">
+                                <div class="flex items-center">
+                                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                                        <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                                            Log Entry Details
+                                        </h3>
+                                        <p class="text-sm text-gray-500">
+                                            Complete information about the selected log entry
+                                        </p>
+                                    </div>
+                                </div>
+                                <button onclick="closeLogDetail()" class="bg-white rounded-md text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    <span class="sr-only">Close</span>
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Modal Content -->
+                            <div class="space-y-6">
+                                <!-- Basic Information -->
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <h4 class="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                                        <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Basic Information
+                                    </h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Timestamp</label>
+                                            <p class="mt-1 text-sm text-gray-900" id="detail-timestamp"></p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Log Level</label>
+                                            <p class="mt-1" id="detail-level"></p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Action Type</label>
+                                            <p class="mt-1" id="detail-action"></p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Source</label>
+                                            <p class="mt-1 text-sm text-gray-900" id="detail-source"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Message Content -->
+                                <div class="bg-blue-50 rounded-lg p-4">
+                                    <h4 class="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                                        <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                        </svg>
+                                        Message Content
+                                    </h4>
+                                    <div class="bg-white rounded border p-3">
+                                        <pre class="whitespace-pre-wrap text-sm text-gray-900 font-mono" id="detail-message"></pre>
+                                    </div>
+                                </div>
+
+                                <!-- Technical Details -->
+                                <div class="bg-yellow-50 rounded-lg p-4">
+                                    <h4 class="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                                        <svg class="w-5 h-5 mr-2 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        </svg>
+                                        Technical Details
+                                    </h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Service</label>
+                                            <p class="mt-1 text-sm text-gray-900" id="detail-service"></p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Environment</label>
+                                            <p class="mt-1 text-sm text-gray-900" id="detail-environment"></p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">Version</label>
+                                            <p class="mt-1 text-sm text-gray-900" id="detail-version"></p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">IP Address</label>
+                                            <p class="mt-1 text-sm text-gray-900" id="detail-ip"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Raw JSON Data -->
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <h4 class="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                                        <svg class="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                        </svg>
+                                        Raw Data
+                                        <button onclick="copyRawData()" class="ml-auto bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs transition-colors duration-200">
+                                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                            </svg>
+                                            Copy
+                                        </button>
+                                    </h4>
+                                    <div class="bg-gray-900 rounded p-3 overflow-x-auto">
+                                        <pre class="text-green-400 text-sm font-mono" id="detail-raw-data"></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button onclick="closeLogDetail()" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Close
+                    </button>
+                    <button onclick="downloadLogEntry()" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Download
+                    </button>
                 </div>
             </div>
         </div>
@@ -308,36 +655,23 @@
     <script>
         let autoRefreshInterval;
         let isAutoRefresh = false;
+        let currentLogData = null;
 
         function filterLogs() {
             const levelFilter = document.getElementById('level-filter').value;
             const typeFilter = document.getElementById('type-filter').value;
             const actionFilter = document.getElementById('action-filter').value;
-            const searchInput = document.getElementById('search-input').value.toLowerCase();
+            const searchInput = document.getElementById('search-input').value;
             
-            const rows = document.querySelectorAll('.log-row');
-            let visibleCount = 0;
+            // Build URL with filters
+            const params = new URLSearchParams();
+            if (levelFilter) params.set('level', levelFilter);
+            if (typeFilter) params.set('type', typeFilter);
+            if (actionFilter) params.set('action', actionFilter);
+            if (searchInput) params.set('search', searchInput);
+            params.set('page', '1'); // Reset to first page when filtering
             
-            rows.forEach(row => {
-                const level = row.getAttribute('data-level');
-                const type = row.getAttribute('data-type');
-                const action = row.getAttribute('data-action');
-                const message = row.textContent.toLowerCase();
-                
-                const levelMatch = !levelFilter || level === levelFilter;
-                const typeMatch = !typeFilter || type === typeFilter;
-                const actionMatch = !actionFilter || action === actionFilter;
-                const searchMatch = !searchInput || message.includes(searchInput);
-                
-                if (levelMatch && typeMatch && actionMatch && searchMatch) {
-                    row.style.display = '';
-                    visibleCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-            
-            document.getElementById('total-logs').textContent = visibleCount;
+            window.location.href = `/logs?${params.toString()}`;
         }
 
         function refreshLogs() {
@@ -404,8 +738,132 @@
             }
         }
 
+        // Modal functions
+        function showLogDetail(logId) {
+            try {
+                const logDataElement = document.getElementById(`log-data-${logId}`);
+                if (!logDataElement) {
+                    console.error('Log data not found for ID:', logId);
+                    return;
+                }
+                
+                currentLogData = JSON.parse(logDataElement.textContent);
+                
+                // Populate modal fields
+                document.getElementById('detail-timestamp').textContent = currentLogData.formattedTime;
+                
+                // Level with styling
+                const levelElement = document.getElementById('detail-level');
+                let levelClass = 'bg-gray-100 text-gray-800';
+                let levelIcon = '';
+                if (currentLogData.level === 'info') {
+                    levelClass = 'bg-blue-100 text-blue-800';
+                    levelIcon = '🔵';
+                } else if (currentLogData.level === 'warning') {
+                    levelClass = 'bg-yellow-100 text-yellow-800';
+                    levelIcon = '⚠️';
+                } else if (currentLogData.level === 'error') {
+                    levelClass = 'bg-red-100 text-red-800';
+                    levelIcon = '🔴';
+                }
+                levelElement.innerHTML = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${levelClass}">
+                    <span class="mr-1">${levelIcon}</span>
+                    ${currentLogData.level.toUpperCase()}
+                </span>`;
+                
+                // Action with styling
+                const actionElement = document.getElementById('detail-action');
+                actionElement.innerHTML = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    ${currentLogData.action}
+                </span>`;
+                
+                document.getElementById('detail-source').textContent = currentLogData.source;
+                document.getElementById('detail-message').textContent = currentLogData.message;
+                
+                // Technical details
+                document.getElementById('detail-service').textContent = currentLogData.metadata.service;
+                document.getElementById('detail-environment').textContent = currentLogData.metadata.environment;
+                document.getElementById('detail-version').textContent = currentLogData.metadata.version;
+                document.getElementById('detail-ip').textContent = currentLogData.metadata.ip;
+                
+                // Raw data
+                document.getElementById('detail-raw-data').textContent = JSON.stringify(currentLogData, null, 2);
+                
+                // Show modal
+                document.getElementById('logDetailModal').classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                
+            } catch (error) {
+                console.error('Error showing log detail:', error);
+                alert('Error loading log details. Please try again.');
+            }
+        }
+
+        function closeLogDetail() {
+            document.getElementById('logDetailModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            currentLogData = null;
+        }
+
+        function copyRawData() {
+            if (!currentLogData) return;
+            
+            const rawData = JSON.stringify(currentLogData, null, 2);
+            navigator.clipboard.writeText(rawData).then(() => {
+                // Show brief success indication
+                const button = event.target.closest('button');
+                const originalText = button.innerHTML;
+                button.innerHTML = `<svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>Copied!`;
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+
+        function downloadLogEntry() {
+            if (!currentLogData) return;
+            
+            const dataStr = JSON.stringify(currentLogData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `log-entry-${currentLogData.id}-${new Date().getTime()}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('logDetailModal');
+            if (event.target === modal) {
+                closeLogDetail();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeLogDetail();
+            }
+        });
+
         // Initialize connection mode check and auto-refresh checkbox styling
         document.addEventListener('DOMContentLoaded', function() {
+            // Set filter values from URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            document.getElementById('level-filter').value = urlParams.get('level') || '';
+            document.getElementById('type-filter').value = urlParams.get('type') || '';
+            document.getElementById('action-filter').value = urlParams.get('action') || '';
+            document.getElementById('search-input').value = urlParams.get('search') || '';
+            
             // Test connection on page load
             testConnection();
             
