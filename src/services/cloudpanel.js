@@ -71,11 +71,32 @@ class CloudPanelService {
               }),
               command: baseCommand,
               exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              fullOutput: stdout + stderr
             });
           } else {
             logger.info(`Command succeeded: ${baseCommand}`);
-            const parsedOutput = ResponseUtils.parseCliOutput(stdout);
-            resolve(parsedOutput);
+            const result = {
+              success: true,
+              output: stdout || 'Command completed successfully',
+              stderr: stderr,
+              command: baseCommand,
+              exitCode: 0
+            };
+            
+            // Try to parse CLI output if available
+            if (stdout) {
+              try {
+                const parsedOutput = ResponseUtils.parseCliOutput(stdout);
+                resolve(parsedOutput);
+              } catch (parseError) {
+                // If parsing fails, return raw output
+                resolve(result);
+              }
+            } else {
+              resolve(result);
+            }
           }
         });
 
@@ -676,21 +697,28 @@ class CloudPanelService {
             logger.error(`Site creation failed for ${domainName}:`, error);
             reject({
               success: false,
+              message: `Site creation failed for ${domainName}`,
               error: ResponseUtils.formatError({
                 error: error.message,
                 stderr,
               }),
               command: baseCreateSiteCommand,
               exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              fullOutput: stdout + stderr
             });
           } else {
             logger.info(`Site created successfully for ${domainName}`);
-            resolve({
+            const result = {
               success: true,
               message: `Site created successfully for ${domainName}`,
-              output: stdout,
+              output: stdout || 'Command completed successfully',
+              stderr: stderr,
               command: baseCreateSiteCommand,
-            });
+              exitCode: 0
+            };
+            resolve(result);
           }
         });
       });
@@ -770,21 +798,28 @@ class CloudPanelService {
             logger.error(`Database creation failed for ${domainName}:`, error);
             reject({
               success: false,
+              message: `Database creation failed for ${domainName}`,
               error: ResponseUtils.formatError({
                 error: error.message,
                 stderr,
               }),
               command: baseCreateDbCommand,
               exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              fullOutput: stdout + stderr
             });
           } else {
             logger.info(`Database created successfully for ${domainName}`);
-            resolve({
+            const result = {
               success: true,
               message: `Database created successfully for ${domainName}`,
-              output: stdout,
+              output: stdout || 'Command completed successfully',
+              stderr: stderr,
               command: baseCreateDbCommand,
-            });
+              exitCode: 0
+            };
+            resolve(result);
           }
         });
       });
@@ -857,20 +892,28 @@ class CloudPanelService {
             logger.error(`SSH key copy failed for user ${siteUser}:`, error);
             reject({
               success: false,
+              message: `SSH key copy failed for user ${siteUser}`,
               error: ResponseUtils.formatError({
                 error: error.message,
                 stderr,
               }),
               command: baseCombinedCommand,
               exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              fullOutput: stdout + stderr
             });
           } else {
             logger.info(`SSH keys successfully copied to user ${siteUser}`);
-            resolve({
+            const result = {
               success: true,
               message: `SSH keys copied to user ${siteUser}`,
-              output: stdout,
-            });
+              output: stdout || 'Command completed successfully',
+              stderr: stderr,
+              command: baseCombinedCommand,
+              exitCode: 0
+            };
+            resolve(result);
           }
         });
       });
@@ -939,21 +982,28 @@ class CloudPanelService {
             logger.error(`Repository clone failed for ${domainName}:`, error);
             reject({
               success: false,
+              message: `Repository clone failed for ${domainName}`,
               error: ResponseUtils.formatError({
                 error: error.message,
                 stderr,
               }),
               command: baseCommand,
               exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              fullOutput: stdout + stderr
             });
           } else {
             logger.info(`Repository cloned successfully for ${domainName}`);
-            resolve({
+            const result = {
               success: true,
               message: `Repository cloned successfully to ${domainName}`,
-              output: stdout,
+              output: stdout || 'Command completed successfully',
+              stderr: stderr,
               command: baseCommand,
-            });
+              exitCode: 0
+            };
+            resolve(result);
           }
         });
       });
@@ -1038,21 +1088,28 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
             logger.error(`Laravel .env configuration failed for ${domainName}:`, error);
             reject({
               success: false,
+              message: `Laravel .env configuration failed for ${domainName}`,
               error: ResponseUtils.formatError({
                 error: error.message,
                 stderr,
               }),
               command: baseCommand,
               exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              fullOutput: stdout + stderr
             });
           } else {
             logger.info(`Laravel .env configured successfully for ${domainName}`);
-            resolve({
+            const result = {
               success: true,
               message: `Laravel .env configured successfully for ${domainName}`,
-              output: stdout,
+              output: stdout || 'Command completed successfully',
+              stderr: stderr,
               command: baseCommand,
-            });
+              exitCode: 0
+            };
+            resolve(result);
           }
         });
       });
@@ -1154,21 +1211,28 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
             logger.error(`Laravel setup commands failed for ${domainName}:`, error);
             reject({
               success: false,
+              message: `Laravel setup commands failed for ${domainName}`,
               error: ResponseUtils.formatError({
                 error: error.message,
                 stderr,
               }),
               command: baseFullCommand,
               exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              fullOutput: stdout + stderr
             });
           } else {
             logger.info(`Laravel setup completed successfully for ${domainName}`);
-            resolve({
+            const result = {
               success: true,
               message: `Laravel setup completed successfully for ${domainName}`,
-              output: stdout,
+              output: stdout || 'Command completed successfully',
+              stderr: stderr,
               command: baseFullCommand,
-            });
+              exitCode: 0
+            };
+            resolve(result);
           }
         });
       });
