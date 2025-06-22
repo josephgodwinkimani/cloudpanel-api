@@ -34,8 +34,13 @@ router.post('/add/nodejs', validate(schemas.addNodejsSite), BaseController.async
  * @access Public
  */
 router.post('/add/php', validate(schemas.addPhpSite), BaseController.asyncHandler(async (req, res) => {
+  const startTime = Date.now();
+  const { domainName, phpVersion, vhostTemplate, siteUser, siteUserPassword } = req.body;
+  const siteDetails = { domainName, phpVersion, vhostTemplate, siteUser };
+  
+  logger.site('info', `Starting PHP site creation for domain: ${domainName}`, siteDetails);
+  
   try {
-    const { domainName, phpVersion, vhostTemplate, siteUser, siteUserPassword } = req.body;
     const result = await cloudpanelService.addPhpSite(
       domainName, 
       phpVersion, 
@@ -44,9 +49,26 @@ router.post('/add/php', validate(schemas.addPhpSite), BaseController.asyncHandle
       siteUserPassword
     );
     
+    const executionTime = Date.now() - startTime;
+    logger.success('site', `PHP site created successfully for domain: ${domainName}`, {
+      ...siteDetails,
+      executionTime: `${executionTime}ms`,
+      hasResult: !!result,
+      resultType: typeof result
+    });
+    
     BaseController.sendSuccess(res, 'PHP site added successfully', result);
   } catch (error) {
-    logger.error('Failed to add PHP site:', error);
+    const executionTime = Date.now() - startTime;
+    logger.failure('site', `PHP site creation failed for domain: ${domainName}`, {
+      ...siteDetails,
+      error: error.error || error.message || error,
+      executionTime: `${executionTime}ms`,
+      errorType: typeof error,
+      hasStderr: !!error.stderr,
+      exitCode: error.exitCode
+    });
+    
     BaseController.sendError(res, 'Failed to add PHP site', error.error || error.message);
   }
 }));

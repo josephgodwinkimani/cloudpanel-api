@@ -27,6 +27,18 @@ class CloudPanelService {
   async executeCommand(command, args = [], options = {}) {
     // Validate SSH configuration in development mode
     if (!this.validateSshConfig()) {
+      const errorDetails = {
+        command: command,
+        args: args,
+        sshConfig: {
+          host: this.sshConfig.host,
+          user: this.sshConfig.user,
+          port: this.sshConfig.port
+        }
+      };
+      
+      logger.failure('cli', 'Invalid SSH configuration for development mode', errorDetails);
+      
       return Promise.reject({
         success: false,
         error: ResponseUtils.formatError({
@@ -40,9 +52,21 @@ class CloudPanelService {
 
     const baseCommand = `${this.clpctlPath} ${command} ${args.join(" ")}`;
 
+    // Log command initiation
+    logger.cli('info', `Initiating CloudPanel CLI command: ${command}`, {
+      command: baseCommand,
+      executionMode: this.isDevelopment ? 'SSH' : 'Local',
+      host: this.sshConfig.host,
+      hasInput: !!options.input
+    });
+
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.info(`SSH Mode: Connecting to ${this.sshConfig.user}@${this.sshConfig.host}:${this.sshConfig.port}`);
-      logger.info(`Executing command via SSH: ${baseCommand}`);
+      logger.cli('info', `SSH Mode: Connecting to ${this.sshConfig.user}@${this.sshConfig.host}:${this.sshConfig.port}`, {
+        command: baseCommand,
+        sshHost: this.sshConfig.host,
+        sshUser: this.sshConfig.user,
+        sshPort: this.sshConfig.port
+      });
       
       // Use SSH client for development mode
       if (options.input) {
@@ -52,7 +76,10 @@ class CloudPanelService {
       }
     } else {
       // Local execution for production
-      logger.info(`Executing command locally: ${baseCommand}`);
+      logger.cli('info', `Local Mode: Executing command directly on server`, {
+        command: baseCommand,
+        timeout: options.timeout || 120000
+      });
       
       return new Promise((resolve, reject) => {
         const execOptions = {
@@ -62,7 +89,16 @@ class CloudPanelService {
 
         const childProcess = exec(baseCommand, execOptions, (error, stdout, stderr) => {
           if (error) {
-            logger.error(`Command failed: ${baseCommand}`, error);
+            const errorDetails = {
+              command: baseCommand,
+              exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              errorMessage: error.message,
+              timeout: execOptions.timeout
+            };
+            
+            logger.failure('cli', `CloudPanel CLI command failed: ${command}`, errorDetails);
             
             // Parse the error output to extract meaningful error messages
             const output = stdout + stderr;
@@ -78,7 +114,16 @@ class CloudPanelService {
               fullOutput: output
             });
           } else {
-            logger.info(`Command succeeded: ${baseCommand}`);
+            const successDetails = {
+              command: baseCommand,
+              exitCode: 0,
+              hasStdout: !!stdout,
+              hasStderr: !!stderr,
+              outputLength: stdout ? stdout.length : 0
+            };
+            
+            logger.success('cli', `CloudPanel CLI command completed successfully: ${command}`, successDetails);
+            
             const result = {
               success: true,
               output: stdout || 'Command completed successfully',
@@ -93,6 +138,11 @@ class CloudPanelService {
                 const parsedOutput = ResponseUtils.parseCliOutput(stdout);
                 resolve(parsedOutput);
               } catch (parseError) {
+                logger.warning('cli', `Failed to parse CLI output for command: ${command}`, {
+                  command: baseCommand,
+                  parseError: parseError.message,
+                  rawOutput: stdout
+                });
                 // If parsing fails, return raw output
                 resolve(result);
               }
@@ -100,6 +150,13 @@ class CloudPanelService {
               resolve(result);
             }
           }
+        });
+
+        // Log process start
+        logger.cli('info', `Started local process for command: ${command}`, {
+          command: baseCommand,
+          pid: childProcess.pid,
+          timeout: execOptions.timeout
         });
 
         // If input is provided for interactive commands, send it
@@ -754,6 +811,16 @@ class CloudPanelService {
   ) {
     // Validate SSH configuration in development mode
     if (!this.validateSshConfig()) {
+      const errorDetails = {
+        domainName,
+        phpVersion,
+        vhostTemplate,
+        siteUser,
+        sshConfig: this.sshConfig
+      };
+      
+      logger.failure('site', 'SSH configuration validation failed for site creation', errorDetails);
+      
       return Promise.reject({
         success: false,
         error: ResponseUtils.formatError({
@@ -775,13 +842,37 @@ class CloudPanelService {
       `--siteUserPassword="${siteUserPassword}"`,
     ].join(" ");
 
+    const siteDetails = {
+      domainName,
+      phpVersion,
+      vhostTemplate,
+      siteUser,
+      command: baseCreateSiteCommand,
+      executionMode: this.isDevelopment ? 'SSH' : 'Local'
+    };
+
+    logger.site('info', `Initiating PHP site creation for domain: ${domainName}`, siteDetails);
+
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.info(`SSH Mode: Creating site for ${domainName}`);
-      logger.info(`Executing command via SSH: ${baseCreateSiteCommand}`);
+      logger.site('info', `SSH Mode: Creating PHP site for ${domainName}`, {
+        ...siteDetails,
+        sshHost: this.sshConfig.host,
+        sshUser: this.sshConfig.user
+      });
       
       try {
         const result = await this.executeSshCommand(baseCreateSiteCommand);
-        logger.info(`Site created successfully for ${domainName}`);
+        
+        logger.success('site', `PHP site created successfully for domain: ${domainName}`, {
+          domainName,
+          phpVersion,
+          vhostTemplate,
+          siteUser,
+          command: baseCreateSiteCommand,
+          outputLength: result.output ? result.output.length : 0,
+          executionTime: new Date().toISOString()
+        });
+        
         return {
           success: true,
           message: `Site created successfully for ${domainName}`,
@@ -791,7 +882,18 @@ class CloudPanelService {
           fullResult: result
         };
       } catch (error) {
-        logger.error(`Site creation failed for ${domainName}:`, error);
+        logger.failure('site', `PHP site creation failed for domain: ${domainName}`, {
+          domainName,
+          phpVersion,
+          vhostTemplate,
+          siteUser,
+          error: error.error || error.message || error,
+          command: baseCreateSiteCommand,
+          stdout: error.stdout,
+          stderr: error.stderr,
+          exitCode: error.exitCode
+        });
+        
         // Return more detailed error information
         return {
           success: false,
@@ -806,10 +908,25 @@ class CloudPanelService {
       }
     } else {
       // Local execution for production
+      logger.site('info', `Local Mode: Creating PHP site for ${domainName}`, siteDetails);
+      
       return new Promise((resolve, reject) => {
         exec(baseCreateSiteCommand, { timeout: 120000 }, (error, stdout, stderr) => {
           if (error) {
-            logger.error(`Site creation failed for ${domainName}:`, error);
+            const errorDetails = {
+              domainName,
+              phpVersion,
+              vhostTemplate,
+              siteUser,
+              command: baseCreateSiteCommand,
+              exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              errorMessage: error.message,
+              fullOutput: stdout + stderr
+            };
+            
+            logger.failure('site', `PHP site creation failed for domain: ${domainName}`, errorDetails);
             
             // Parse the error output to extract meaningful error messages
             const output = stdout + stderr;
@@ -826,7 +943,19 @@ class CloudPanelService {
               fullOutput: output
             });
           } else {
-            logger.info(`Site created successfully for ${domainName}`);
+            const successDetails = {
+              domainName,
+              phpVersion,
+              vhostTemplate,
+              siteUser,
+              command: baseCreateSiteCommand,
+              exitCode: 0,
+              outputLength: stdout ? stdout.length : 0,
+              executionTime: new Date().toISOString()
+            };
+            
+            logger.success('site', `PHP site created successfully for domain: ${domainName}`, successDetails);
+            
             const result = {
               success: true,
               message: `Site created successfully for ${domainName}`,
@@ -858,6 +987,15 @@ class CloudPanelService {
   ) {
     // Validate SSH configuration in development mode
     if (!this.validateSshConfig()) {
+      const errorDetails = {
+        domainName,
+        databaseName,
+        databaseUserName,
+        sshConfig: this.sshConfig
+      };
+      
+      logger.failure('database', 'SSH configuration validation failed for database creation', errorDetails);
+      
       return Promise.reject({
         success: false,
         error: ResponseUtils.formatError({
@@ -878,13 +1016,35 @@ class CloudPanelService {
       `--databaseUserPassword="${databaseUserPassword}"`,
     ].join(" ");
 
+    const dbDetails = {
+      domainName,
+      databaseName,
+      databaseUserName,
+      command: baseCreateDbCommand,
+      executionMode: this.isDevelopment ? 'SSH' : 'Local'
+    };
+
+    logger.database('info', `Initiating database creation for domain: ${domainName}`, dbDetails);
+
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.info(`SSH Mode: Creating database for ${domainName}`);
-      logger.info(`Executing command via SSH: ${baseCreateDbCommand}`);
+      logger.database('info', `SSH Mode: Creating database for ${domainName}`, {
+        ...dbDetails,
+        sshHost: this.sshConfig.host,
+        sshUser: this.sshConfig.user
+      });
       
       try {
         const result = await this.executeSshCommand(baseCreateDbCommand);
-        logger.info(`Database created successfully for ${domainName}`);
+        
+        logger.success('database', `Database created successfully for domain: ${domainName}`, {
+          domainName,
+          databaseName,
+          databaseUserName,
+          command: baseCreateDbCommand,
+          outputLength: result.output ? result.output.length : 0,
+          executionTime: new Date().toISOString()
+        });
+        
         return {
           success: true,
           message: `Database created successfully for ${domainName}`,
@@ -894,7 +1054,17 @@ class CloudPanelService {
           fullResult: result
         };
       } catch (error) {
-        logger.error(`Database creation failed for ${domainName}:`, error);
+        logger.failure('database', `Database creation failed for domain: ${domainName}`, {
+          domainName,
+          databaseName,
+          databaseUserName,
+          error: error.error || error.message || error,
+          command: baseCreateDbCommand,
+          stdout: error.stdout,
+          stderr: error.stderr,
+          exitCode: error.exitCode
+        });
+        
         // Return more detailed error information
         return {
           success: false,
@@ -909,10 +1079,24 @@ class CloudPanelService {
       }
     } else {
       // Local execution for production
+      logger.database('info', `Local Mode: Creating database for ${domainName}`, dbDetails);
+      
       return new Promise((resolve, reject) => {
         exec(baseCreateDbCommand, { timeout: 120000 }, (error, stdout, stderr) => {
           if (error) {
-            logger.error(`Database creation failed for ${domainName}:`, error);
+            const errorDetails = {
+              domainName,
+              databaseName,
+              databaseUserName,
+              command: baseCreateDbCommand,
+              exitCode: error.code,
+              stdout: stdout,
+              stderr: stderr,
+              errorMessage: error.message,
+              fullOutput: stdout + stderr
+            };
+            
+            logger.failure('database', `Database creation failed for domain: ${domainName}`, errorDetails);
             
             // Parse the error output to extract meaningful error messages
             const output = stdout + stderr;
@@ -929,7 +1113,18 @@ class CloudPanelService {
               fullOutput: output
             });
           } else {
-            logger.info(`Database created successfully for ${domainName}`);
+            const successDetails = {
+              domainName,
+              databaseName,
+              databaseUserName,
+              command: baseCreateDbCommand,
+              exitCode: 0,
+              outputLength: stdout ? stdout.length : 0,
+              executionTime: new Date().toISOString()
+            };
+            
+            logger.success('database', `Database created successfully for domain: ${domainName}`, successDetails);
+            
             const result = {
               success: true,
               message: `Database created successfully for ${domainName}`,
@@ -1294,9 +1489,29 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
 
     const baseFullCommand = commands.join(" && ");
 
+    // Create a version of the command without composer install for logging
+    const commandsForLogging = [];
+    
+    // Skip composer install in logging
+    if (runMigrations) {
+      commandsForLogging.push(`${baseCommand} && php artisan migrate --force'`);
+    }
+
+    if (runSeeders) {
+      commandsForLogging.push(`${baseCommand} && php artisan db:seed --force'`);
+    }
+
+    if (optimizeCache) {
+      commandsForLogging.push(
+        `${baseCommand} && php artisan config:cache && php artisan route:cache && php artisan view:cache'`
+      );
+    }
+
+    const commandForLogging = commandsForLogging.length > 0 ? commandsForLogging.join(" && ") : "Laravel setup commands (excluding composer install)";
+
     if (this.isDevelopment && this.sshConfig.host) {
       logger.info(`SSH Mode: Running Laravel setup for ${domainName}`);
-      logger.info(`Executing command via SSH: ${baseFullCommand}`);
+      logger.info(`Executing command via SSH: ${commandForLogging}`);
       
       try {
         const result = await this.executeSshCommand(baseFullCommand);
@@ -1306,7 +1521,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
           message: `Laravel setup completed successfully for ${domainName}`,
           output: result.output || result,
           stderr: result.stderr,
-          command: baseFullCommand,
+          command: commandForLogging,
           fullResult: result
         };
       } catch (error) {
@@ -1318,7 +1533,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
           stdout: error.stdout,
           stderr: error.stderr,
           fullOutput: error.fullOutput,
-          command: baseFullCommand,
+          command: commandForLogging,
           exitCode: error.exitCode
         };
       }
@@ -1335,7 +1550,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
                 error: error.message,
                 stderr,
               }),
-              command: baseFullCommand,
+              command: commandForLogging,
               exitCode: error.code,
               stdout: stdout,
               stderr: stderr,
@@ -1348,7 +1563,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
               message: `Laravel setup completed successfully for ${domainName}`,
               output: stdout || 'Command completed successfully',
               stderr: stderr,
-              command: baseFullCommand,
+              command: commandForLogging,
               exitCode: 0
             };
             resolve(result);

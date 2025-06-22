@@ -13,6 +13,11 @@ const {
   requestLogger,
   errorHandler,
 } = require("./middleware");
+const { 
+  requestLoggingMiddleware, 
+  authLoggingMiddleware, 
+  errorLoggingMiddleware 
+} = require("./middleware/logging");
 
 // Import routes
 const cloudflareRoutes = require("./routes/cloudflare");
@@ -102,7 +107,10 @@ async function initializeApp() {
 
   app.use(cors());
 
-  // Request logging
+  // Enhanced request logging with detailed tracking
+  app.use(requestLoggingMiddleware);
+  
+  // Original request logging (keeping for compatibility)
   app.use(requestLogger);
 
   // Rate limiting
@@ -116,13 +124,18 @@ async function initializeApp() {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
 
+  // Authentication logging middleware
+  app.use("/api/", authLoggingMiddleware);
+
   // API authentication (optional in development)
   app.use("/api/", authenticateApiKey);
 
-  // Logging middleware
-  app.use((req, res, next) => {
-    logger.info(`${req.method} ${req.path} - ${req.ip}`);
-    next();
+  // Application startup logging
+  logger.logAction('info', 'startup', 'CloudPanel API application starting up', {
+    port: PORT,
+    nodeEnv: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    pid: process.pid
   });
 
   // API routes (these need session middleware)
@@ -142,6 +155,9 @@ async function initializeApp() {
   app.use("/logs", logsRoutes);
   app.use("/setup", setupRoutes);
 
+  // Enhanced error logging middleware (must be before error handler)
+  app.use(errorLoggingMiddleware);
+
   // Redirect root to login
   app.get("/", (req, res) => {
     if (req.session && req.session.user) {
@@ -156,6 +172,23 @@ async function initializeApp() {
 
   // 404 handler
   app.use("*", (req, res) => {
+    // Skip logging for frontend routes (except login/logout)
+    const isFrontendRoute = (req.originalUrl.startsWith('/sites') || 
+                            req.originalUrl.startsWith('/docs') || 
+                            req.originalUrl.startsWith('/logs')) &&
+                           !req.originalUrl.includes('/login') && 
+                           !req.originalUrl.includes('/logout');
+    
+    if (!isFrontendRoute) {
+      logger.warning('request', `404 - Route not found: ${req.method} ${req.originalUrl}`, {
+        method: req.method,
+        url: req.originalUrl,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        requestId: req.requestId
+      });
+    }
+    
     res.status(404).json({ error: "Endpoint not found" });
   });
 }
@@ -259,13 +292,21 @@ module.exports = app;
 
 // Graceful shutdown handler
 process.on("SIGINT", async () => {
-  logger.info("Received SIGINT, shutting down gracefully...");
+  logger.logAction('info', 'shutdown', 'Received SIGINT, shutting down gracefully...', {
+    signal: 'SIGINT',
+    timestamp: new Date().toISOString(),
+    pid: process.pid
+  });
   await sessionStore.close();
   process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
-  logger.info("Received SIGTERM, shutting down gracefully...");
+  logger.logAction('info', 'shutdown', 'Received SIGTERM, shutting down gracefully...', {
+    signal: 'SIGTERM',
+    timestamp: new Date().toISOString(),
+    pid: process.pid
+  });
   await sessionStore.close();
   process.exit(0);
 });
@@ -275,11 +316,21 @@ if (require.main === module) {
   initializeApp()
     .then(() => {
       app.listen(PORT, () => {
-        logger.info(`CloudPanel API server running on port ${PORT}`);
-        logger.info(`Environment: ${process.env.NODE_ENV || "development"}`);
+        logger.success('startup', `CloudPanel API server started successfully on port ${PORT}`, {
+          port: PORT,
+          environment: process.env.NODE_ENV || "development",
+          timestamp: new Date().toISOString(),
+          pid: process.pid,
+          httpMode: true,
+          deployment: 'VPS optimized'
+        });
         
         // Always log HTTP mode since we're forcing HTTP-only deployment
-        logger.info("🌐 Running in HTTP mode - optimized for VPS deployment");
+        logger.logAction('info', 'startup', '🌐 Running in HTTP mode - optimized for VPS deployment', {
+          protocol: 'HTTP',
+          httpsRedirect: false,
+          secureHeaders: false
+        });
         logger.info("📡 COOP/COEP headers disabled to prevent browser warnings");
         logger.info(`� Access the application at: http://your-vps-ip:${PORT}`);
         logger.info(`🌐 Health check available at: http://your-vps-ip:${PORT}/health`);

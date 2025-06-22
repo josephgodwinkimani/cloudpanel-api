@@ -71,13 +71,44 @@ router.post(
   "/add",
   validate(schemas.addUser),
   BaseController.asyncHandler(async (req, res) => {
+    const startTime = Date.now();
+    const userDetails = {
+      userName: req.body.userName,
+      email: req.body.email,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      role: req.body.role,
+      status: req.body.status,
+      timezone: req.body.timezone,
+      sites: req.body.sites
+    };
+    
+    logger.user('info', `Starting user creation process for: ${req.body.userName}`, userDetails);
+    
     try {
       const userData = req.body;
       const result = await cloudpanelService.addUser(userData);
+      
+      const executionTime = Date.now() - startTime;
+      logger.success('user', `User created successfully: ${req.body.userName}`, {
+        ...userDetails,
+        executionTime: `${executionTime}ms`,
+        resultType: typeof result,
+        hasOutput: !!result.output
+      });
 
       BaseController.sendSuccess(res, "User added successfully", result);
     } catch (error) {
-      logger.error("Failed to add user:", error);
+      const executionTime = Date.now() - startTime;
+      logger.failure('user', `User creation failed for: ${req.body.userName}`, {
+        ...userDetails,
+        error: error.error || error.message || error,
+        executionTime: `${executionTime}ms`,
+        errorType: typeof error,
+        hasStderr: !!error.stderr,
+        exitCode: error.exitCode
+      });
+      
       BaseController.sendError(
         res,
         "Failed to add user",
@@ -96,13 +127,35 @@ router.delete(
   "/delete",
   validate(schemas.deleteUser),
   BaseController.asyncHandler(async (req, res) => {
+    const startTime = Date.now();
+    const { userName, force } = req.body;
+    const deleteDetails = { userName, force: force || true };
+    
+    logger.user('info', `Starting user deletion process for: ${userName}`, deleteDetails);
+    
     try {
-      const { userName, force } = req.body;
       const result = await cloudpanelService.deleteUser(userName, force);
+      
+      const executionTime = Date.now() - startTime;
+      logger.success('user', `User deleted successfully: ${userName}`, {
+        ...deleteDetails,
+        executionTime: `${executionTime}ms`,
+        resultType: typeof result,
+        hasOutput: !!result.output
+      });
 
       BaseController.sendSuccess(res, "User deleted successfully", result);
     } catch (error) {
-      logger.error("Failed to delete user:", error);
+      const executionTime = Date.now() - startTime;
+      logger.failure('user', `User deletion failed for: ${userName}`, {
+        ...deleteDetails,
+        error: error.error || error.message || error,
+        executionTime: `${executionTime}ms`,
+        errorType: typeof error,
+        hasStderr: !!error.stderr,
+        exitCode: error.exitCode
+      });
+      
       BaseController.sendError(
         res,
         "Failed to delete user",

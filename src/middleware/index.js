@@ -96,6 +96,17 @@ const moderateRateLimit = createRateLimit(
 const requestLogger = (req, res, next) => {
   const start = Date.now();
   
+  // Skip logging for frontend routes (except login/logout)
+  const isFrontendRoute = (req.originalUrl.startsWith('/sites') || 
+                          req.originalUrl.startsWith('/docs') || 
+                          req.originalUrl.startsWith('/logs')) &&
+                         !req.originalUrl.includes('/login') && 
+                         !req.originalUrl.includes('/logout');
+  
+  if (isFrontendRoute) {
+    return next();
+  }
+  
   res.on('finish', () => {
     const duration = Date.now() - start;
     logger.info(`${req.method} ${req.originalUrl}`, {

@@ -361,12 +361,11 @@ async function getSitesList() {
     const sites = [];
 
     if (isDevelopment && sshConfig.host) {
-      logger.info("Using SSH mode for sites listing");
+      // Using SSH mode for sites listing
       
       // First, let's debug by checking what directories exist
       const debugCommand = `ls -la /home/`;
       const debugResult = await executeSshCommand(debugCommand);
-      logger.info("Home directory contents:", debugResult.output);
       
       // Simplified approach - check each known user directory
       const checkUsersCommand = `
@@ -380,7 +379,6 @@ async function getSitesList() {
       
       const usersResult = await executeSshCommand(checkUsersCommand);
       const userLines = usersResult.output.split('\n').filter(line => line.startsWith('USER_FOUND:'));
-      logger.info(`Found ${userLines.length} users`);
       
       for (const userLine of userLines) {
         const user = userLine.replace('USER_FOUND:', '');
@@ -615,8 +613,6 @@ async function getSitesList() {
           const domainsResult = await executeSshCommand(domainsCommand);
           const domainLines = domainsResult.output.split('\n').filter(line => line.startsWith('SITE_DATA|'));
           
-          logger.info(`Found ${domainLines.length} domains for user ${user}`);
-          
           for (const domainLine of domainLines) {
             try {
               const parts = domainLine.replace('SITE_DATA|', '').split('|');
@@ -640,76 +636,19 @@ async function getSitesList() {
                 };
                 
                 sites.push(siteInfo);
-                logger.info(`Added site: ${domainName} (${frameworkInfo.type}${frameworkInfo.framework ? `/${frameworkInfo.framework}` : ''}) for user ${userName}`);
               }
             } catch (err) {
-              logger.warn(`Error parsing domain data: ${domainLine} - ${err.message}`);
+              // Skip error logging for frontend access
             }
           }
         } catch (err) {
-          logger.warn(`Error checking domains for user ${user}: ${err.message}`);
-        }
-      }
-    } else {
-      // Local execution - keep the original logic for local development
-      const homeDir = "/home";
-      const userDirs = await readDirectory(homeDir);
-
-      for (const userDir of userDirs) {
-        const userPath = path.posix.join(homeDir, userDir);
-
-        try {
-          // Check if it's a directory
-          const stat = await getStats(userPath);
-          if (!stat.isDirectory()) continue;
-
-          // Skip system directories
-          if (["mysql", "setup", "clp"].includes(userDir)) continue;
-
-          // Check for htdocs directory
-          const htdocsPath = path.posix.join(userPath, "htdocs");
-
-          if (await pathExists(htdocsPath)) {
-            const htdocsStat = await getStats(htdocsPath);
-            if (htdocsStat.isDirectory()) {
-              // Read domains in htdocs
-              const domains = await readDirectory(htdocsPath);
-
-              for (const domain of domains) {
-                const domainPath = path.posix.join(htdocsPath, domain);
-
-                try {
-                  const domainStat = await getStats(domainPath);
-
-                  if (domainStat.isDirectory()) {
-                    // Get domain info
-                    const domainInfo = await getDomainInfo(
-                      domainPath,
-                      domain,
-                      userDir
-                    );
-                    sites.push(domainInfo);
-                  }
-                } catch (err) {
-                  logger.warn(`Error reading domain ${domain}: ${err.message}`);
-                  continue;
-                }
-              }
-            }
-          }
-        } catch (err) {
-          logger.warn(
-            `Error reading user directory ${userDir}: ${err.message}`
-          );
-          continue;
+          // Skip error logging for frontend access
         }
       }
     }
 
-    logger.info(`Total sites found: ${sites.length}`);
     return sites;
   } catch (error) {
-    logger.error("Error reading sites list:", error);
     throw error;
   }
 }
@@ -1128,7 +1067,7 @@ router.get("/", async (req, res) => {
       formatFileSize: formatFileSize,
     });
   } catch (error) {
-    logger.error("Error loading sites page:", error);
+    // Skip frontend error logging
 
     // Clean up connection on error
     cleanupSshConnection();
@@ -1158,7 +1097,7 @@ router.get("/api/list", async (req, res) => {
       total: sites.length,
     });
   } catch (error) {
-    logger.error("Error getting sites list:", error);
+    // Skip frontend error logging
 
     // Clean up connection on error
     cleanupSshConnection();
@@ -1191,7 +1130,7 @@ router.get("/api/:domain", async (req, res) => {
       data: site,
     });
   } catch (error) {
-    logger.error("Error getting site details:", error);
+    // Skip frontend error logging
     res.status(500).json({
       success: false,
       message: "Failed to retrieve site details",

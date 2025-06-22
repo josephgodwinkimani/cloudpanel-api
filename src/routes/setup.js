@@ -14,22 +14,39 @@ router.post(
   "/",
   validate(schemas.setupLaravel),
   BaseController.asyncHandler(async (req, res) => {
+    const startTime = Date.now();
+    const {
+      domainName,
+      phpVersion = "8.3",
+      vhostTemplate = "Laravel 12",
+      siteUser,
+      siteUserPassword,
+      databaseName,
+      databaseUserName,
+      databaseUserPassword,
+    } = req.body;
+
+    const setupDetails = {
+      domainName,
+      phpVersion,
+      vhostTemplate,
+      siteUser,
+      databaseName,
+      databaseUserName,
+      hasRepository: !!req.body.repositoryUrl
+    };
+
+    logger.site('info', `Starting complete Laravel setup for domain: ${domainName}`, setupDetails);
+
     try {
-      const {
-        domainName,
-        phpVersion = "8.3",
-        vhostTemplate = "Laravel 12",
-        siteUser,
-        siteUserPassword,
-        databaseName,
-        databaseUserName,
-        databaseUserPassword,
-      } = req.body;
-
-      logger.info(`Starting Laravel setup for domain: ${domainName}`);
-
       // Step 1: Create PHP site with Laravel
-      logger.info(`Creating PHP site with Laravel for ${domainName}`);
+      logger.site('info', `Step 1: Creating PHP site with Laravel for ${domainName}`, {
+        domainName,
+        phpVersion,
+        vhostTemplate,
+        siteUser
+      });
+      
       const siteResult = await cloudpanelService.createSiteSetup(
         domainName,
         phpVersion,
@@ -39,14 +56,23 @@ router.post(
       );
 
       if (!siteResult.success) {
+        logger.failure('site', `Laravel site creation failed in setup for ${domainName}`, {
+          domainName,
+          error: siteResult.error,
+          step: '1 - Site Creation'
+        });
         throw new Error(
           `${siteResult.error || "Unknown error"}`
         );
       }
 
-      logger.info(
-        `PHP site created successfully: ${JSON.stringify(siteResult)}`
-      );
+      logger.success('site', `Laravel PHP site created successfully for ${domainName}`, {
+        domainName,
+        phpVersion,
+        vhostTemplate,
+        siteUser,
+        step: '1 - Site Creation'
+      });
 
       // Step 2: Create database for the Laravel site
       logger.info(`Creating database for ${domainName}`);
@@ -174,7 +200,7 @@ router.post(
         try {
           const setupOptions = {
             runMigrations: req.body.runMigrations !== true,
-            runSeeders: req.body.runSeeders === true,
+            runSeeders: req.body.runSeeders !== true,
             optimizeCache: req.body.optimizeCache !== true,
             installComposer: req.body.installComposer !== true,
           };
@@ -186,13 +212,13 @@ router.post(
           );
 
           if (!laravelSetupResult.success) {
-            try {
-              await cloudpanelService.deleteSite(domainName, true);
-            } catch (cleanupError) {
-              logger.error(
-                `Failed to cleanup site after database error: ${cleanupError.message}`
-              );
-            }
+            // try {
+            //   await cloudpanelService.deleteSite(domainName, true);
+            // } catch (cleanupError) {
+            //   logger.error(
+            //     `Failed to cleanup site after database error: ${cleanupError.message}`
+            //   );
+            // }
             logger.error(
               `Laravel setup commands failed: ${
                 laravelSetupResult.error || "Unknown error"

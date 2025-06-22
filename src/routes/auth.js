@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const router = express.Router();
+const logger = require('../utils/logger');
 
 // Import database service
 const databaseService = require('../services/database');
@@ -97,34 +98,69 @@ router.post('/login', async (req, res) => {
       req.session.error = 'Username and password are required';
       return res.redirect('/auth/login');
     }
-    
-    // Find user in database
+     // Find user in database
     const user = await databaseService.findUserByUsername(username);
     if (!user) {
+      // Log failed login attempt
+      logger.warning('security', `Login failed - invalid username: ${username}`, {
+        username: username,
+        reason: 'invalid_username',
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date().toISOString()
+      });
+      
       req.session.error = 'Invalid username or password';
       return res.redirect('/auth/login');
     }
-    
+
     // Verify password
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
+      // Log failed login attempt
+      logger.warning('security', `Login failed - invalid password: ${username}`, {
+        username: username,
+        reason: 'invalid_password',
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date().toISOString()
+      });
+      
       req.session.error = 'Invalid username or password';
       return res.redirect('/auth/login');
     }
-    
-    // Update last login
+     // Update last login
     await databaseService.updateLastLogin(user.id);
+    
+    // Log successful login
+    logger.security('info', `User login successful: ${username}`, {
+      userId: user.id,
+      username: username,
+      ip: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString()
+    });
     
     // Set session
     req.session.user = {
       id: user.id,
       username: user.username
     };
-    
+
     res.redirect('/docs');
     
   } catch (error) {
     console.error('Error during login:', error);
+    
+    // Log failed login attempt
+    logger.warning('security', `Login attempt failed: ${req.body.username || 'unknown'}`, {
+      username: req.body.username || 'unknown',
+      error: error.message,
+      ip: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent'),
+      timestamp: new Date().toISOString()
+    });
+    
     req.session.error = 'An error occurred during login';
     res.redirect('/auth/login');
   }
@@ -132,6 +168,16 @@ router.post('/login', async (req, res) => {
 
 // Logout route
 router.get('/logout', (req, res) => {
+  const username = req.session.user ? req.session.user.username : 'unknown';
+  
+  // Log logout
+  logger.security('info', `User logout: ${username}`, {
+    username: username,
+    ip: req.ip || req.connection.remoteAddress,
+    userAgent: req.get('User-Agent'),
+    timestamp: new Date().toISOString()
+  });
+  
   req.session.destroy((err) => {
     if (err) {
       console.error('Error destroying session:', err);
