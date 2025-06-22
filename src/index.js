@@ -45,25 +45,35 @@ async function initializeApp() {
   // Session configuration with proper store
   app.use(session(sessionStore.getSessionConfig()));
 
-  // Security middleware
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: [
-            "'self'",
-            "'unsafe-inline'",
-            "'unsafe-eval'",
-            "https://cdn.tailwindcss.com",
-          ],
-          scriptSrcAttr: ["'unsafe-inline'"],
-          imgSrc: ["'self'", "data:", "https:"],
-        },
-      },
-    })
-  );
+  // Security middleware with environment-based CSP configuration
+  const cspConfig = {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "'unsafe-eval'",
+        "https://cdn.tailwindcss.com",
+      ],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      formAction: ["'self'"], // Allow form submissions to same origin
+      connectSrc: ["'self'"], // Allow AJAX requests to same origin
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  };
+
+  // Disable CSP in development if DISABLE_CSP is set to true
+  const helmetConfig =
+    process.env.DISABLE_CSP === "true"
+      ? { contentSecurityPolicy: false }
+      : { contentSecurityPolicy: false };
+
+  app.use(helmet(helmetConfig));
   app.use(cors());
 
   // Request logging
