@@ -67,13 +67,39 @@ async function initializeApp() {
     },
   };
 
-  // Disable CSP in development if DISABLE_CSP is set to true
-  const helmetConfig =
-    process.env.DISABLE_CSP === "true"
-      ? { contentSecurityPolicy: false }
-      : { contentSecurityPolicy: false };
+  // Configure helmet for HTTP deployment - always disable HTTPS-only headers
+  const helmetConfig = {
+    contentSecurityPolicy: false,
+    // Always disable COOP/COEP headers to avoid browser warnings over HTTP
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    // Keep basic security headers that work over HTTP
+    crossOriginResourcePolicy: { policy: "same-origin" },
+    referrerPolicy: { policy: "no-referrer" },
+    // Never enable HSTS for HTTP deployment
+    hsts: false,
+    // Disable other HTTPS-only features
+    noSniff: true,
+    frameguard: { action: 'deny' },
+    xssFilter: true
+  };
 
   app.use(helmet(helmetConfig));
+  
+  // Custom middleware for HTTP deployment
+  app.use((req, res, next) => {
+    // Always configure for HTTP deployment
+    // Set basic security headers that work over HTTP
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
+    // Never set HTTPS-only headers for HTTP deployment
+    // No HSTS, no secure transport security
+    
+    next();
+  });
+
   app.use(cors());
 
   // Request logging
@@ -251,6 +277,13 @@ if (require.main === module) {
       app.listen(PORT, () => {
         logger.info(`CloudPanel API server running on port ${PORT}`);
         logger.info(`Environment: ${process.env.NODE_ENV || "development"}`);
+        
+        // Always log HTTP mode since we're forcing HTTP-only deployment
+        logger.info("🌐 Running in HTTP mode - optimized for VPS deployment");
+        logger.info("📡 COOP/COEP headers disabled to prevent browser warnings");
+        logger.info(`� Access the application at: http://your-vps-ip:${PORT}`);
+        logger.info(`🌐 Health check available at: http://your-vps-ip:${PORT}/health`);
+        logger.info(`📚 API documentation at: http://your-vps-ip:${PORT}/docs`);
       });
     })
     .catch((error) => {

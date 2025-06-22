@@ -120,6 +120,9 @@ class SessionStore {
   }
 
   getSessionConfig() {
+    // Always use HTTP-safe session configuration
+    // Never use secure cookies since we're forcing HTTP deployment
+    
     return {
       store: this.store,
       secret:
@@ -129,14 +132,13 @@ class SessionStore {
       saveUninitialized: false,
       rolling: true, // Reset expiry on activity
       cookie: {
-        secure:
-          process.env.NODE_ENV === "production" &&
-          !process.env.DISABLE_SECURE_COOKIES &&
-          process.env.FORCE_HTTP !== "true",
+        secure: false, // Always false for HTTP deployment
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         sameSite: "lax",
       },
+      // Add session name for better identification
+      name: 'cloudpanel.sid'
     };
   }
 
