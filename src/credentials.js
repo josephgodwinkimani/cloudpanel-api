@@ -1,18 +1,14 @@
 /**
- * Credentials storage for API documentation access
- * This file stores user credentials for accessing the API documentation views
+ * DEPRECATED: This file is no longer used for storing credentials
+ * User authentication data is now stored in SQLite database: data/auth.db
+ * 
+ * This file is kept for backward compatibility and migration purposes.
+ * You can safely delete this file once you've confirmed the SQLite migration worked correctly.
  */
 
+// Legacy credentials structure - no longer used
 const credentials = {
-  "users": [
-    {
-      "id": 1,
-      "username": "farrasfarras",
-      "password": "$2b$10$vxnGXf/mMDJ40bqdxbsTseaVexh34b8Qn7SK1RxtKo7ip3d33rAl2",
-      "createdAt": "2025-06-20T09:42:27.452Z",
-      "lastLogin": "2025-06-20T09:51:51.537Z"
-    }
-  ]
+  "users": []
 };
 
 module.exports = credentials;

@@ -1,31 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const fs = require('fs');
-const path = require('path');
 const router = express.Router();
 
-// Import credentials
-const credentialsPath = path.join(__dirname, '../credentials.js');
-
-// Helper function to read credentials
-const readCredentials = () => {
-  delete require.cache[require.resolve('../credentials.js')];
-  return require('../credentials.js');
-};
-
-// Helper function to write credentials
-const writeCredentials = (credentials) => {
-  const content = `/**
- * Credentials storage for API documentation access
- * This file stores user credentials for accessing the API documentation views
- */
-
-const credentials = ${JSON.stringify(credentials, null, 2)};
-
-module.exports = credentials;`;
-
-  fs.writeFileSync(credentialsPath, content);
-};
+// Import database service
+const databaseService = require('../services/database');
 
 // Create credential route
 router.get('/create-credential', (req, res) => {
@@ -64,11 +42,8 @@ router.post('/create-credential', async (req, res) => {
       return res.redirect('/auth/create-credential');
     }
     
-    // Read current credentials
-    const credentials = readCredentials();
-    
     // Check if username already exists
-    const existingUser = credentials.users.find(user => user.username === username);
+    const existingUser = await databaseService.findUserByUsername(username);
     if (existingUser) {
       req.session.error = 'Username already exists';
       return res.redirect('/auth/create-credential');
@@ -78,20 +53,8 @@ router.post('/create-credential', async (req, res) => {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     
-    // Create new user
-    const newUser = {
-      id: credentials.users.length + 1,
-      username: username,
-      password: hashedPassword,
-      createdAt: new Date().toISOString(),
-      lastLogin: null
-    };
-    
-    // Add user to credentials
-    credentials.users.push(newUser);
-    
-    // Save credentials
-    writeCredentials(credentials);
+    // Create new user in database
+    await databaseService.createUser(username, hashedPassword);
     
     req.session.success = 'Account created successfully! You can now login.';
     res.redirect('/auth/login');
@@ -135,11 +98,8 @@ router.post('/login', async (req, res) => {
       return res.redirect('/auth/login');
     }
     
-    // Read credentials
-    const credentials = readCredentials();
-    
-    // Find user
-    const user = credentials.users.find(u => u.username === username);
+    // Find user in database
+    const user = await databaseService.findUserByUsername(username);
     if (!user) {
       req.session.error = 'Invalid username or password';
       return res.redirect('/auth/login');
@@ -153,8 +113,7 @@ router.post('/login', async (req, res) => {
     }
     
     // Update last login
-    user.lastLogin = new Date().toISOString();
-    writeCredentials(credentials);
+    await databaseService.updateLastLogin(user.id);
     
     // Set session
     req.session.user = {
@@ -182,17 +141,13 @@ router.get('/logout', (req, res) => {
 });
 
 // Clear all credentials route (admin function)
-router.post('/clear-credentials', (req, res) => {
+router.post('/clear-credentials', async (req, res) => {
   try {
     const { confirmClear } = req.body;
     
     if (confirmClear === 'YES_CLEAR_ALL') {
-      // Clear all credentials
-      const emptyCredentials = {
-        users: []
-      };
-      
-      writeCredentials(emptyCredentials);
+      // Clear all users from database
+      await databaseService.clearAllUsers();
       
       // Destroy session
       req.session.destroy((err) => {
