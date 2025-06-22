@@ -90,6 +90,11 @@ const FRAMEWORK_TYPES = {
 
 // SSH configuration for development mode
 const isDevelopment = process.env.NODE_ENV === "development";
+const isProduction = process.env.NODE_ENV === "production";
+
+// Log environment mode
+logger.info(`Sites module running in mode: ${process.env.NODE_ENV || 'undefined'} (isDevelopment: ${isDevelopment}, isProduction: ${isProduction})`);
+
 const sshConfig = {
   host: process.env.VPS_HOST || "localhost",
   user: process.env.VPS_USER || "root",
@@ -99,6 +104,7 @@ const sshConfig = {
 
 // Validate SSH configuration in development mode
 function validateSshConfig() {
+  // In production mode, SSH config is not required
   if (!isDevelopment) {
     return true;
   }
@@ -248,7 +254,7 @@ async function executeSshCommand(command) {
 
 // Read directory via SSH or locally
 async function readDirectory(dirPath) {
-  if (isDevelopment && sshConfig.host) {
+  if (isDevelopment) {
     try {
       const command = `ls -la "${dirPath}" 2>/dev/null || echo "DIRECTORY_NOT_FOUND"`;
       const result = await executeSshCommand(command);
@@ -288,14 +294,14 @@ async function readDirectory(dirPath) {
       throw new Error(`SSH readdir failed: ${error.message}`);
     }
   } else {
-    // Local execution
+    // Production mode - Local execution
     return await fs.readdir(dirPath);
   }
 }
 
 // Get file/directory stats via SSH or locally
 async function getStats(filePath) {
-  if (isDevelopment && sshConfig.host) {
+  if (isDevelopment) {
     try {
       const command = `stat -c "%Y %Z %s %F" "${filePath}" 2>/dev/null || echo "STAT_ERROR"`;
       const result = await executeSshCommand(command);
@@ -321,14 +327,14 @@ async function getStats(filePath) {
       throw new Error(`SSH stat failed: ${error.message}`);
     }
   } else {
-    // Local execution
+    // Production mode - Local execution
     return await fs.stat(filePath);
   }
 }
 
 // Check if path exists via SSH or locally
 async function pathExists(filePath) {
-  if (isDevelopment && sshConfig.host) {
+  if (isDevelopment) {
     try {
       const command = `test -e "${filePath}" && echo "EXISTS" || echo "NOT_EXISTS"`;
       const result = await executeSshCommand(command);
@@ -337,7 +343,7 @@ async function pathExists(filePath) {
       return false;
     }
   } else {
-    // Local execution
+    // Production mode - Local execution
     try {
       await fs.stat(filePath);
       return true;
@@ -353,15 +359,16 @@ router.use(requireAuth);
 // Get all sites from /home directory structure (optimized for SSH)
 async function getSitesList() {
   try {
-    // Validate SSH configuration in development mode
-    if (!validateSshConfig()) {
-      throw new Error("Invalid SSH configuration for development mode");
-    }
-
+    logger.info(`Starting getSitesList - isDevelopment: ${isDevelopment}`);
     const sites = [];
 
-    if (isDevelopment && sshConfig.host) {
-      // Using SSH mode for sites listing
+    if (isDevelopment) {
+      // Validate SSH configuration in development mode
+      if (!validateSshConfig()) {
+        throw new Error("Invalid SSH configuration for development mode");
+      }
+
+      logger.info("Using SSH mode for sites listing");
       
       // First, let's debug by checking what directories exist
       const debugCommand = `ls -la /home/`;
@@ -645,10 +652,97 @@ async function getSitesList() {
           // Skip error logging for frontend access
         }
       }
+    } else {
+      // Production mode - read sites locally
+      logger.info("Running in production mode - reading sites locally");
+      try {
+        let homeDir = '/home';
+        
+        // Check if /home directory exists, fallback to alternative paths
+        if (!(await pathExists(homeDir))) {
+          logger.warn("Home directory /home does not exist, trying alternatives...");
+          
+          // Try alternative paths commonly used in different environments
+          const alternatives = ['/var/www/html', '/opt/cloudpanel/home', './data/sites'];
+          let found = false;
+          
+          for (const altPath of alternatives) {
+            if (await pathExists(altPath)) {
+              homeDir = altPath;
+              found = true;
+              logger.info(`Using alternative home directory: ${homeDir}`);
+              break;
+            }
+          }
+          
+          if (!found) {
+            logger.warn("No valid home directory found, returning empty sites list");
+            return sites;
+          }
+        }
+        
+        const users = await readDirectory(homeDir);
+        logger.info(`Found ${users.length} users in ${homeDir} directory: ${users.join(', ')}`);
+        
+        for (const user of users) {
+          // Skip system directories and common non-user directories
+          if (['mysql', 'setup', 'clp', 'lost+found', '.git'].includes(user) || user.startsWith('.')) {
+            logger.debug(`Skipping system user: ${user}`);
+            continue;
+          }
+          
+          const userPath = path.posix.join(homeDir, user);
+          
+          // Check different possible site directory structures
+          const possibleSiteDirs = ['htdocs', 'public_html', 'www', 'sites'];
+          let sitesDir = null;
+          
+          for (const dir of possibleSiteDirs) {
+            const candidatePath = path.posix.join(userPath, dir);
+            if (await pathExists(candidatePath)) {
+              sitesDir = candidatePath;
+              logger.info(`Found sites directory for user ${user}: ${candidatePath}`);
+              break;
+            }
+          }
+          
+          if (!sitesDir) {
+            logger.debug(`No sites directory found for user ${user}`);
+            continue;
+          }
+          
+          try {
+            const domains = await readDirectory(sitesDir);
+            logger.info(`Found ${domains.length} domains for user ${user}: ${domains.join(', ')}`);
+            
+            for (const domain of domains) {
+              try {
+                const domainPath = path.posix.join(sitesDir, domain);
+                const domainInfo = await getDomainInfo(domainPath, domain, user);
+                sites.push(domainInfo);
+                logger.debug(`Added site: ${domain} (${domainInfo.type})`);
+              } catch (err) {
+                // Skip domains we can't access
+                logger.warn(`Cannot access domain ${domain} for user ${user}: ${err.message}`);
+              }
+            }
+          } catch (err) {
+            // Skip users without sites directory or permission issues
+            logger.warn(`Cannot access sites directory for user ${user}: ${err.message}`);
+          }
+        }
+        
+        logger.info(`Total sites found in production: ${sites.length}`);
+      } catch (error) {
+        logger.error(`Error reading sites in production mode: ${error.message}`);
+        throw new Error('Failed to read sites directory in production');
+      }
     }
 
     return sites;
   } catch (error) {
+    logger.error(`Error in getSitesList: ${error.message}`);
+    logger.error(`Stack trace: ${error.stack}`);
     throw error;
   }
 }
@@ -720,7 +814,7 @@ async function detectSiteType(domainPath, files) {
     // Helper function to check if file contains specific content
     const checkFileContent = async (filePath, searchText) => {
       try {
-        if (isDevelopment && sshConfig.host) {
+        if (isDevelopment) {
           const command = `grep -q "${searchText}" "${filePath}" 2>/dev/null && echo "FOUND" || echo "NOT_FOUND"`;
           const result = await executeSshCommand(command);
           return result.output.trim() === "FOUND";
@@ -994,13 +1088,13 @@ function getFrameworkInfo(detectedType) {
 // Calculate directory size (simplified version)
 async function getDirSize(dirPath) {
   try {
-    if (isDevelopment && sshConfig.host) {
+    if (isDevelopment) {
       // Use SSH to get directory size
       const command = `du -sb "${dirPath}" 2>/dev/null | cut -f1 || echo "0"`;
       const result = await executeSshCommand(command);
       return parseInt(result.output.trim()) || 0;
     } else {
-      // Local execution - simplified calculation
+      // Production mode - Local execution - simplified calculation
       let totalSize = 0;
       const files = await fs.readdir(dirPath);
 
@@ -1045,7 +1139,7 @@ router.get("/", async (req, res) => {
   try {
     // Add timeout to prevent hanging
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("SSH operation timeout")), 30000); // 30 second timeout
+      setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
     });
 
     const sites = await Promise.race([getSitesList(), timeoutPromise]);
@@ -1067,10 +1161,13 @@ router.get("/", async (req, res) => {
       formatFileSize: formatFileSize,
     });
   } catch (error) {
-    // Skip frontend error logging
+    logger.error(`Error loading sites list: ${error.message}`);
+    logger.error(`Stack trace: ${error.stack}`);
 
-    // Clean up connection on error
-    cleanupSshConnection();
+    // Clean up connection on error (development mode only)
+    if (isDevelopment) {
+      cleanupSshConnection();
+    }
 
     res.status(500).render("error", {
       title: "Error",
@@ -1085,7 +1182,7 @@ router.get("/api/list", async (req, res) => {
   try {
     // Add timeout to prevent hanging
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("SSH operation timeout")), 30000); // 30 second timeout
+      setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
     });
 
     const sites = await Promise.race([getSitesList(), timeoutPromise]);
@@ -1097,10 +1194,13 @@ router.get("/api/list", async (req, res) => {
       total: sites.length,
     });
   } catch (error) {
-    // Skip frontend error logging
+    logger.error(`Error in API sites list: ${error.message}`);
+    logger.error(`Stack trace: ${error.stack}`);
 
-    // Clean up connection on error
-    cleanupSshConnection();
+    // Clean up connection on error (development mode only)
+    if (isDevelopment) {
+      cleanupSshConnection();
+    }
 
     res.status(500).json({
       success: false,
@@ -1130,7 +1230,7 @@ router.get("/api/:domain", async (req, res) => {
       data: site,
     });
   } catch (error) {
-    // Skip frontend error logging
+    logger.error(`Error getting site details for ${req.params.domain}: ${error.message}`);
     res.status(500).json({
       success: false,
       message: "Failed to retrieve site details",
