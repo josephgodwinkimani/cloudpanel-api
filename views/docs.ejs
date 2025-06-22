@@ -135,6 +135,7 @@
                             <a href="#letsencrypt" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🔒 Let's Encrypt</a>
                             <a href="#vhost-templates" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">📄 VHost Templates</a>
                             <a href="#setup" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">⚙️ Setup</a>
+                            <a href="#logs" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">📋 Logs</a>
                         </div>
                     </div>
                 </div>
@@ -784,6 +785,215 @@
   "success": true,
   "message": "Laravel setup completed successfully",
   "timestamp": "2025-06-22T12:00:00Z"
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Site Management Endpoints -->
+                <div class="mb-12">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">🔧 Additional Site Management</h3>
+                    
+                    <!-- Add Python Site -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-yellow-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/site/add/python</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Create a new Python website</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "python-app.com",
+  "pythonVersion": "3.11",
+  "appPort": 8000,
+  "siteUser": "pythonuser",
+  "siteUserPassword": "secure-password-123"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Python site added successfully",
+  "data": {
+    "domainName": "python-app.com",
+    "pythonVersion": "3.11",
+    "appPort": 8000,
+    "siteUser": "pythonuser",
+    "created_at": "2025-06-22T12:00:00Z"
+  }
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Add Static Site -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-gray-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/site/add/static</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Create a new static HTML website</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "static-site.com",
+  "siteUser": "staticuser",
+  "siteUserPassword": "secure-password-123"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Static site added successfully",
+  "data": {
+    "domainName": "static-site.com",
+    "siteUser": "staticuser",
+    "created_at": "2025-06-22T12:00:00Z"
+  }
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Add Reverse Proxy -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-indigo-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/site/add/reverse-proxy</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Create a reverse proxy configuration</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "proxy.example.com",
+  "reverseProxyUrl": "http://localhost:3000",
+  "siteUser": "proxyuser",
+  "siteUserPassword": "secure-password-123"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Reverse proxy added successfully",
+  "data": {
+    "domainName": "proxy.example.com",
+    "reverseProxyUrl": "http://localhost:3000",
+    "siteUser": "proxyuser",
+    "created_at": "2025-06-22T12:00:00Z"
+  }
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Install Site Certificate -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-600">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/site/install-certificate</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Install a custom SSL certificate for a site</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "example.com",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----",
+  "certificate": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----",
+  "certificateChain": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Certificate installed successfully",
+  "data": {
+    "domainName": "example.com",
+    "installed_at": "2025-06-22T12:00:00Z"
+  }
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Delete Site -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-red-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-red-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">DELETE</span>
+                                <span class="font-mono font-bold text-gray-800">/api/site/delete</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Delete a site and its configuration</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "example.com",
+  "force": false
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Site deleted successfully",
+  "data": {
+    "domainName": "example.com",
+    "deleted_at": "2025-06-22T12:00:00Z"
+  }
 }</pre>
                                 </div>
                             </div>
