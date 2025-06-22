@@ -40,7 +40,7 @@ router.post(
 
       if (!siteResult.success) {
         throw new Error(
-          `Failed to create PHP site: ${siteResult.error || "Unknown error"}`
+          `${siteResult.error || "Unknown error"}`
         );
       }
 
@@ -70,7 +70,7 @@ router.post(
           );
         }
         throw new Error(
-          `Failed to create database: ${dbResult.error || "Unknown error"}`
+          `${dbResult.error || "Unknown error"}`
         );
       }
 
@@ -173,10 +173,10 @@ router.post(
         logger.info(`Running Laravel setup commands for ${domainName}`);
         try {
           const setupOptions = {
-            runMigrations: req.body.runMigrations !== false,
+            runMigrations: req.body.runMigrations !== true,
             runSeeders: req.body.runSeeders === true,
-            optimizeCache: req.body.optimizeCache !== false,
-            installComposer: req.body.installComposer !== false,
+            optimizeCache: req.body.optimizeCache !== true,
+            installComposer: req.body.installComposer !== true,
           };
 
           laravelSetupResult = await cloudpanelService.runLaravelSetup(
