@@ -4,672 +4,789 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CloudPanel API Documentation</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-        .content {
-            padding: 30px;
-        }
-        .endpoint-group {
-            margin-bottom: 40px;
-        }
-        .endpoint-group h2 {
-            color: #333;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-        .endpoint {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-        }
-        .endpoint-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        .method {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 12px;
-            margin-right: 15px;
-            min-width: 60px;
-            text-align: center;
-        }
-        .method.get { background: #28a745; color: white; }
-        .method.post { background: #007bff; color: white; }
-        .method.delete { background: #dc3545; color: white; }
-        .method.put { background: #ffc107; color: black; }
-        .path {
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            color: #333;
-            flex: 1;
-        }
-        .description {
-            margin-bottom: 15px;
-            color: #666;
-            font-style: italic;
-        }
-        .details {
-            display: none;
-            margin-top: 15px;
-            border-top: 1px solid #dee2e6;
-            padding-top: 15px;
-        }
-        .details.show {
-            display: block;
-        }
-        .toggle-btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-left: auto;
-        }
-        .toggle-btn:hover {
-            background: #5a67d8;
-        }
-        .section {
-            margin-bottom: 20px;
-        }
-        .section h4 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        .code-block {
-            background: #2d3748;
-            color: #e2e8f0;
-            padding: 15px;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-        }
-        .auth-info {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 4px;
-            padding: 10px;
-            margin-bottom: 15px;
-            font-size: 13px;
-        }
-        .logout {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            text-decoration: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            transition: background 0.3s;
-        }
-        .logout:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        .param-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-size: 13px;
-        }
-        .param-table th,
-        .param-table td {
-            border: 1px solid #dee2e6;
-            padding: 8px 12px;
-            text-align: left;
-        }
-        .param-table th {
-            background: #f8f9fa;
-            font-weight: 600;
-        }
-        .required {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        .optional {
-            color: #6c757d;
-        }
-    </style>
+    </script>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <a href="/auth/logout" class="logout">Logout</a>
-            <h1>CloudPanel API Documentation</h1>
-            <p>Complete API reference with examples for CloudPanel management</p>
-        </div>
-        
-        <div class="content">
-            <div class="auth-info">
-                <strong>🔐 Authentication Required:</strong> All API endpoints require API key authentication via the <code>X-API-Key</code> header.
-            </div>
-
-            <div class="endpoint-group">
-                <h2>🌩️ Cloudflare</h2>
-                
-                <div class="endpoint">
-                    <div class="endpoint-header">
-                        <span class="method post">POST</span>
-                        <span class="path">/api/cloudflare/update-ips</span>
-                        <button class="toggle-btn" data-toggle="details">Show Details</button>
+<body class="bg-gray-50 font-sans">
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <!-- Navigation Header -->
+            <nav class="bg-white border-b border-gray-200 shadow-sm">
+                <div class="px-8 py-4">
+                    <div class="flex justify-between items-center">
+                        <!-- Logo/Brand -->
+                        <div class="flex items-center space-x-4">
+                            <div class="text-2xl font-bold text-blue-600">CloudPanel</div>
+                            <span class="text-gray-400">|</span>
+                            <span class="text-gray-600 font-medium">API Management</span>
+                        </div>
+                        
+                        <!-- Navigation Menu -->
+                        <div class="flex items-center space-x-6">
+                            <a href="/docs" class="flex items-center px-4 py-2 text-blue-600 bg-blue-50 rounded-lg font-medium transition-all duration-200 hover:bg-blue-100">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Docs
+                            </a>
+                            <a href="/sites" class="flex items-center px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9"></path>
+                                </svg>
+                                Site Lists
+                            </a>
+                            <a href="/logs" class="flex items-center px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                Logs
+                            </a>
+                            
+                            <!-- User Menu -->
+                            <div class="relative group">
+                                <button class="flex items-center px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                    Account
+                                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                
+                                <!-- Dropdown Menu -->
+                                <div class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                                    <div class="py-2">
+                                        <a href="/profile" class="block px-4 py-2 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors duration-200">
+                                            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            Profile
+                                        </a>
+                                        <a href="/settings" class="block px-4 py-2 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors duration-200">
+                                            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            </svg>
+                                            Settings
+                                        </a>
+                                        <hr class="my-2 border-gray-200">
+                                        <a href="/auth/logout" class="block px-4 py-2 text-red-600 hover:bg-red-50 transition-colors duration-200">
+                                            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                            </svg>
+                                            Logout
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="description">Update Cloudflare IP addresses in server configuration</div>
+                </div>
+            </nav>
+            
+            <!-- Header -->
+            <div class="relative bg-gradient-to-r from-blue-600 to-purple-600 text-white p-8 text-center">
+                <h1 class="text-3xl font-bold mb-2">CloudPanel API Documentation</h1>
+                <p class="text-blue-100">Complete API reference with examples for CloudPanel management</p>
+            </div>
+            
+            <div class="p-8">
+                <!-- Search and Navigation -->
+                <div class="mb-8">
+                    <div class="relative mb-6">
+                        <input 
+                            type="text" 
+                            id="search-input" 
+                            placeholder="Search endpoints..." 
+                            class="w-full px-4 py-3 pl-12 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
                     
-                    <div class="details">
-                        <div class="section">
-                            <h4>Headers</h4>
-                            <div class="code-block">{
+                    <!-- Quick Navigation -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <h3 class="font-semibold text-blue-800 mb-3">📚 Quick Navigation</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <a href="#cloudflare" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🌩️ Cloudflare</a>
+                            <a href="#cloudpanel" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">☁️ CloudPanel</a>
+                            <a href="#database" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🗄️ Database</a>
+                            <a href="#user-management" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">👥 User Management</a>
+                            <a href="#site-management" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🌐 Site Management</a>
+                            <a href="#letsencrypt" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🔒 Let's Encrypt</a>
+                            <a href="#vhost-templates" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">📄 VHost Templates</a>
+                            <a href="#setup" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">⚙️ Setup</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Authentication Info -->
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
+                    <div class="flex items-start">
+                        <div class="text-yellow-600 mr-3 text-xl">🔐</div>
+                        <div>
+                            <strong class="text-yellow-800">Authentication Required:</strong>
+                            <span class="text-yellow-700 ml-2">All API endpoints require API key authentication via the <code class="bg-yellow-100 px-1 rounded text-sm">X-API-Key</code> header.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cloudflare Section -->
+                <div class="mb-12" id="cloudflare">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🌩️ Cloudflare</h2>
+                    
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/cloudflare/update-ips</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Update Cloudflare IP addresses in server configuration</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Headers</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "Content-Type": "application/json",
   "X-API-Key": "your-api-key-here"
-}</div>
-                        </div>
-
-                        <div class="section">
-                            <h4>Request Body</h4>
-                            <div class="code-block">{
-  "force": false,
-  "backup": true
-}</div>
-                            <table class="param-table">
-                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                                <tr><td>force</td><td>boolean</td><td class="optional">Optional</td><td>Force update even if IPs are current</td></tr>
-                                <tr><td>backup</td><td>boolean</td><td class="optional">Optional</td><td>Create backup before updating</td></tr>
-                            </table>
-                        </div>
-
-                        <div class="section">
-                            <h4>Response Example</h4>
-                            <div class="code-block">{
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body (Optional)</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  // No body parameters required
+}</pre>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6">
+                                <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Cloudflare IPs updated successfully",
   "data": {
     "updated_ips": 15,
-    "backup_created": true,
-    "timestamp": "2025-06-17T12:00:00Z"
+    "timestamp": "2025-06-22T12:00:00Z"
   }
-}</div>
-                        </div>
-
-                        <div class="section">
-                            <h4>cURL Example</h4>
-                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/cloudflare/update-ips" \
+}</pre>
+                            </div>
+                            
+                            <div class="mt-6">
+                                <h4 class="font-semibold text-gray-800 mb-2">cURL Example</h4>
+                                <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">curl -X POST "<%= baseUrl %>/api/cloudflare/update-ips" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
-    "force": false,
-    "backup": true
-  }'</div>
+  -H "X-API-Key: your-api-key-here"</pre>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="endpoint-group">
-                <h2>☁️ Cloudpanel</h2>
-                
-                <div class="endpoint">
-                    <div class="endpoint-header">
-                        <span class="method post">POST</span>
-                        <span class="path">/api/cloudpanel/basic-auth/enable</span>
-                        <button class="toggle-btn" data-toggle="details">Show Details</button>
-                    </div>
-                    <div class="description">Enable basic authentication for CloudPanel</div>
+                <!-- CloudPanel Section -->
+                <div class="mb-12" id="cloudpanel">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">☁️ CloudPanel</h2>
                     
-                    <div class="details">
-                        <div class="section">
-                            <h4>Headers</h4>
-                            <div class="code-block">{
-  "Content-Type": "application/json",
-  "X-API-Key": "your-api-key-here"
-}</div>
+                    <!-- Enable Basic Auth -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/cloudpanel/basic-auth/enable</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
                         </div>
-
-                        <div class="section">
-                            <h4>Request Body</h4>
-                            <div class="code-block">{
-  "username": "admin",
-  "password": "secure-password-123",
-  "realm": "CloudPanel Admin Area"
-}</div>
-                            <table class="param-table">
-                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                                <tr><td>username</td><td>string</td><td class="required">Required</td><td>Username for basic auth</td></tr>
-                                <tr><td>password</td><td>string</td><td class="required">Required</td><td>Password for basic auth (min 8 chars)</td></tr>
-                                <tr><td>realm</td><td>string</td><td class="optional">Optional</td><td>Authentication realm description</td></tr>
-                            </table>
-                        </div>
-
-                        <div class="section">
-                            <h4>Response Example</h4>
-                            <div class="code-block">{
+                        <p class="text-gray-600 italic mb-4">Enable basic authentication for CloudPanel</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "userName": "admin",
+  "password": "secure-password-123"
+}</pre>
+                                    
+                                    <table class="w-full mt-4 text-sm border-collapse">
+                                        <thead>
+                                            <tr class="bg-gray-100">
+                                                <th class="border border-gray-300 px-3 py-2 text-left">Parameter</th>
+                                                <th class="border border-gray-300 px-3 py-2 text-left">Type</th>
+                                                <th class="border border-gray-300 px-3 py-2 text-left">Required</th>
+                                                <th class="border border-gray-300 px-3 py-2 text-left">Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="border border-gray-300 px-3 py-2">userName</td>
+                                                <td class="border border-gray-300 px-3 py-2">string</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Username for basic auth</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="border border-gray-300 px-3 py-2">password</td>
+                                                <td class="border border-gray-300 px-3 py-2">string</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Password (min 6 chars)</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Basic authentication enabled successfully",
   "data": {
-    "username": "admin",
-    "realm": "CloudPanel Admin Area",
-    "enabled_at": "2025-06-17T12:00:00Z"
+    "userName": "admin",
+    "enabled_at": "2025-06-22T12:00:00Z"
   }
-}</div>
-                        </div>
-
-                        <div class="section">
-                            <h4>cURL Example</h4>
-                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/cloudpanel/basic-auth/enable" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
-    "username": "admin",
-    "password": "secure-password-123",
-    "realm": "CloudPanel Admin Area"
-  }'</div>
+}</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="endpoint">
-                    <div class="endpoint-header">
-                        <span class="method delete">DELETE</span>
-                        <span class="path">/api/cloudpanel/basic-auth/disable</span>
-                        <button class="toggle-btn" data-toggle="details">Show Details</button>
-                    </div>
-                    <div class="description">Disable basic authentication for CloudPanel</div>
                     
-                    <div class="details">
-                        <div class="section">
-                            <h4>Headers</h4>
-                            <div class="code-block">{
-  "X-API-Key": "your-api-key-here"
-}</div>
+                    <!-- Disable Basic Auth -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-red-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-red-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">DELETE</span>
+                                <span class="font-mono font-bold text-gray-800">/api/cloudpanel/basic-auth/disable</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
                         </div>
-
-                        <div class="section">
-                            <h4>Request Body</h4>
-                            <div class="code-block">No body required</div>
-                        </div>
-
-                        <div class="section">
-                            <h4>Response Example</h4>
-                            <div class="code-block">{
+                        <p class="text-gray-600 italic mb-4">Disable basic authentication for CloudPanel</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">No body required</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Basic authentication disabled successfully",
   "data": {
-    "disabled_at": "2025-06-17T12:00:00Z"
+    "disabled_at": "2025-06-22T12:00:00Z"
   }
-}</div>
-                        </div>
-
-                        <div class="section">
-                            <h4>cURL Example</h4>
-                            <div class="code-block">curl -X DELETE "<%= baseUrl %>/api/cloudpanel/basic-auth/disable" \
-  -H "X-API-Key: your-api-key-here"</div>
+}</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="endpoint-group">
-                <h2>🗄️ Database</h2>
-                
-                <div class="endpoint">
-                    <div class="endpoint-header">
-                        <span class="method get">GET</span>
-                        <span class="path">/api/database/master-credentials</span>
-                        <button class="toggle-btn" data-toggle="details">Show Details</button>
-                    </div>
-                    <div class="description">Retrieve master database credentials</div>
+                <!-- Database Section -->
+                <div class="mb-12" id="database">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🗄️ Database</h2>
                     
-                    <div class="details">
-                        <div class="section">
-                            <h4>Headers</h4>
-                            <div class="code-block">{
+                    <!-- Get Master Credentials -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
+                                <span class="font-mono font-bold text-gray-800">/api/database/master-credentials</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Retrieve master database credentials</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Headers</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "X-API-Key": "your-api-key-here"
-}</div>
-                        </div>
-
-                        <div class="section">
-                            <h4>Query Parameters</h4>
-                            <table class="param-table">
-                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                                <tr><td>format</td><td>string</td><td class="optional">Optional</td><td>Response format: json, plain (default: json)</td></tr>
-                                <tr><td>include_password</td><td>boolean</td><td class="optional">Optional</td><td>Include password in response (default: true)</td></tr>
-                            </table>
-                        </div>
-
-                        <div class="section">
-                            <h4>Response Example</h4>
-                            <div class="code-block">{
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
+  "message": "Master credentials retrieved successfully",
   "data": {
     "host": "localhost",
     "port": 3306,
     "username": "root",
-    "password": "master-db-password",
-    "connection_string": "mysql://root:master-db-password@localhost:3306"
+    "password": "master-db-password"
   }
-}</div>
-                        </div>
-
-                        <div class="section">
-                            <h4>cURL Example</h4>
-                            <div class="code-block">curl -X GET "<%= baseUrl %>/api/database/master-credentials?format=json" \
-  -H "X-API-Key: your-api-key-here"</div>
+}</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="endpoint">
-                    <div class="endpoint-header">
-                        <span class="method post">POST</span>
-                        <span class="path">/api/database/add</span>
-                        <button class="toggle-btn" data-toggle="details">Show Details</button>
-                    </div>
-                    <div class="description">Create a new database with user</div>
                     
-                    <div class="details">
-                        <div class="section">
-                            <h4>Headers</h4>
-                            <div class="code-block">{
-  "Content-Type": "application/json",
-  "X-API-Key": "your-api-key-here"
-}</div>
+                    <!-- Add Database -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/database/add</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
                         </div>
-
-                        <div class="section">
-                            <h4>Request Body</h4>
-                            <div class="code-block">{
-  "database_name": "myapp_production",
-  "username": "myapp_user",
-  "password": "secure-db-password-123",
-  "host": "localhost",
-  "charset": "utf8mb4",
-  "collation": "utf8mb4_unicode_ci"
-}</div>
-                            <table class="param-table">
-                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                                <tr><td>database_name</td><td>string</td><td class="required">Required</td><td>Name of the database to create</td></tr>
-                                <tr><td>username</td><td>string</td><td class="required">Required</td><td>Database user to create</td></tr>
-                                <tr><td>password</td><td>string</td><td class="required">Required</td><td>Password for database user</td></tr>
-                                <tr><td>host</td><td>string</td><td class="optional">Optional</td><td>Host for user access (default: localhost)</td></tr>
-                                <tr><td>charset</td><td>string</td><td class="optional">Optional</td><td>Database charset (default: utf8mb4)</td></tr>
-                                <tr><td>collation</td><td>string</td><td class="optional">Optional</td><td>Database collation (default: utf8mb4_unicode_ci)</td></tr>
-                            </table>
-                        </div>
-
-                        <div class="section">
-                            <h4>Response Example</h4>
-                            <div class="code-block">{
+                        <p class="text-gray-600 italic mb-4">Create a new database with user</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "example.com",
+  "databaseName": "myapp_production",
+  "databaseUserName": "myapp_user",
+  "databaseUserPassword": "secure-db-password-123"
+}</pre>
+                                    
+                                    <table class="w-full mt-4 text-sm border-collapse">
+                                        <thead>
+                                            <tr class="bg-gray-100">
+                                                <th class="border border-gray-300 px-3 py-2 text-left">Parameter</th>
+                                                <th class="border border-gray-300 px-3 py-2 text-left">Type</th>
+                                                <th class="border border-gray-300 px-3 py-2 text-left">Required</th>
+                                                <th class="border border-gray-300 px-3 py-2 text-left">Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="border border-gray-300 px-3 py-2">domainName</td>
+                                                <td class="border border-gray-300 px-3 py-2">string</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Associated domain name</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="border border-gray-300 px-3 py-2">databaseName</td>
+                                                <td class="border border-gray-300 px-3 py-2">string</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Name of database to create</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="border border-gray-300 px-3 py-2">databaseUserName</td>
+                                                <td class="border border-gray-300 px-3 py-2">string</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Database user to create</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="border border-gray-300 px-3 py-2">databaseUserPassword</td>
+                                                <td class="border border-gray-300 px-3 py-2">string</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Password (min 6 chars)</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
-  "message": "Database and user created successfully",
+  "message": "Database added successfully",
   "data": {
-    "database_name": "myapp_production",
-    "username": "myapp_user",
-    "host": "localhost",
-    "charset": "utf8mb4",
-    "collation": "utf8mb4_unicode_ci",
-    "connection_string": "mysql://myapp_user:secure-db-password-123@localhost:3306/myapp_production",
-    "created_at": "2025-06-17T12:00:00Z"
+    "domainName": "example.com",
+    "databaseName": "myapp_production",
+    "databaseUserName": "myapp_user",
+    "created_at": "2025-06-22T12:00:00Z"
   }
-}</div>
-                        </div>
-
-                        <div class="section">
-                            <h4>cURL Example</h4>
-                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/database/add" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
-    "database_name": "myapp_production",
-    "username": "myapp_user",
-    "password": "secure-db-password-123"
-  }'</div>
+}</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="endpoint-group">
-                <h2>🔐 User Management</h2>
-                
-                <div class="endpoint">
-                    <div class="endpoint-header">
-                        <span class="method post">POST</span>
-                        <span class="path">/api/user/create</span>
-                        <button class="toggle-btn" data-toggle="details">Show Details</button>
-                    </div>
-                    <div class="description">Create a new system user</div>
+                <!-- User Management Section -->
+                <div class="mb-12" id="user-management">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">👥 User Management</h2>
                     
-                    <div class="details">
-                        <div class="section">
-                            <h4>Headers</h4>
-                            <div class="code-block">{
-  "Content-Type": "application/json",
-  "X-API-Key": "your-api-key-here"
-}</div>
+                    <!-- Add User -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/user/add</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
                         </div>
-
-                        <div class="section">
-                            <h4>Request Body</h4>
-                            <div class="code-block">{
-  "username": "newuser",
+                        <p class="text-gray-600 italic mb-4">Create a new CloudPanel user</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "userName": "newuser",
+  "email": "user@example.com",
+  "firstName": "John",
+  "lastName": "Doe",
   "password": "secure-password-123",
-  "group": "www-data",
-  "shell": "/bin/bash",
-  "home_directory": "/home/newuser",
-  "create_home": true
-}</div>
-                            <table class="param-table">
-                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                                <tr><td>username</td><td>string</td><td class="required">Required</td><td>System username</td></tr>
-                                <tr><td>password</td><td>string</td><td class="required">Required</td><td>User password</td></tr>
-                                <tr><td>group</td><td>string</td><td class="optional">Optional</td><td>Primary group (default: username)</td></tr>
-                                <tr><td>shell</td><td>string</td><td class="optional">Optional</td><td>User shell (default: /bin/bash)</td></tr>
-                                <tr><td>home_directory</td><td>string</td><td class="optional">Optional</td><td>Home directory path</td></tr>
-                                <tr><td>create_home</td><td>boolean</td><td class="optional">Optional</td><td>Create home directory (default: true)</td></tr>
-                            </table>
-                        </div>
-
-                        <div class="section">
-                            <h4>Response Example</h4>
-                            <div class="code-block">{
+  "role": "admin",
+  "timezone": "UTC",
+  "status": "1"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
-  "message": "User created successfully",
+  "message": "User added successfully",
   "data": {
-    "username": "newuser",
-    "uid": 1001,
-    "gid": 1001,
-    "home_directory": "/home/newuser",
-    "shell": "/bin/bash",
-    "created_at": "2025-06-17T12:00:00Z"
+    "userName": "newuser",
+    "email": "user@example.com",
+    "role": "admin",
+    "created_at": "2025-06-22T12:00:00Z"
   }
-}</div>
+}</pre>
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="section">
-                            <h4>cURL Example</h4>
-                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/user/create" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
-    "username": "newuser",
-    "password": "secure-password-123",
-    "group": "www-data"
-  }'</div>
+                    </div>
+                    
+                    <!-- List Users -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
+                                <span class="font-mono font-bold text-gray-800">/api/user/list</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">List all CloudPanel users</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Headers</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "X-API-Key": "your-api-key-here"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Users retrieved successfully",
+  "data": [
+    {
+      "userName": "admin",
+      "email": "admin@example.com",
+      "role": "admin",
+      "status": "active"
+    }
+  ]
+}</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="endpoint-group">
-                <h2>🌐 Site Management</h2>
-                
-                <div class="endpoint">
-                    <div class="endpoint-header">
-                        <span class="method post">POST</span>
-                        <span class="path">/api/site/create</span>
-                        <button class="toggle-btn" data-toggle="details">Show Details</button>
-                    </div>
-                    <div class="description">Create a new website/domain</div>
+                <!-- Site Management Section -->
+                <div class="mb-12" id="site-management">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🌐 Site Management</h2>
                     
-                    <div class="details">
-                        <div class="section">
-                            <h4>Headers</h4>
-                            <div class="code-block">{
-  "Content-Type": "application/json",
-  "X-API-Key": "your-api-key-here"
-}</div>
+                    <!-- Add PHP Site -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/site/add/php</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
                         </div>
-
-                        <div class="section">
-                            <h4>Request Body</h4>
-                            <div class="code-block">{
-  "domain": "example.com",
-  "type": "php",
-  "php_version": "8.2",
-  "document_root": "/home/user/htdocs/example.com",
-  "owner": "user",
-  "ssl": true,
-  "aliases": ["www.example.com"]
-}</div>
-                            <table class="param-table">
-                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                                <tr><td>domain</td><td>string</td><td class="required">Required</td><td>Primary domain name</td></tr>
-                                <tr><td>type</td><td>string</td><td class="required">Required</td><td>Site type: php, static, nodejs, python</td></tr>
-                                <tr><td>php_version</td><td>string</td><td class="optional">Optional</td><td>PHP version (for PHP sites)</td></tr>
-                                <tr><td>document_root</td><td>string</td><td class="optional">Optional</td><td>Document root path</td></tr>
-                                <tr><td>owner</td><td>string</td><td class="required">Required</td><td>Site owner username</td></tr>
-                                <tr><td>ssl</td><td>boolean</td><td class="optional">Optional</td><td>Enable SSL (default: true)</td></tr>
-                                <tr><td>aliases</td><td>array</td><td class="optional">Optional</td><td>Domain aliases</td></tr>
-                            </table>
-                        </div>
-
-                        <div class="section">
-                            <h4>Response Example</h4>
-                            <div class="code-block">{
+                        <p class="text-gray-600 italic mb-4">Create a new PHP website</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "example.com",
+  "phpVersion": "8.3",
+  "vhostTemplate": "Laravel 12",
+  "siteUser": "webuser",
+  "siteUserPassword": "secure-password-123"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
-  "message": "Site created successfully",
+  "message": "PHP site added successfully",
   "data": {
-    "domain": "example.com",
-    "type": "php",
-    "php_version": "8.2",
-    "document_root": "/home/user/htdocs/example.com",
-    "owner": "user",
-    "ssl": true,
-    "aliases": ["www.example.com"],
-    "nginx_config": "/etc/nginx/sites-available/example.com",
-    "created_at": "2025-06-17T12:00:00Z"
+    "domainName": "example.com",
+    "phpVersion": "8.3",
+    "siteUser": "webuser",
+    "created_at": "2025-06-22T12:00:00Z"
   }
-}</div>
+}</pre>
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="section">
-                            <h4>cURL Example</h4>
-                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/site/create" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
-    "domain": "example.com",
-    "type": "php",
-    "owner": "user"
-  }'</div>
+                    </div>
+                    
+                    <!-- Add Node.js Site -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/site/add/nodejs</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Create a new Node.js website</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "nodeapp.com",
+  "nodejsVersion": 20,
+  "appPort": 3000,
+  "siteUser": "nodeuser",
+  "siteUserPassword": "secure-password-123"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Node.js site added successfully",
+  "data": {
+    "domainName": "nodeapp.com",
+    "nodejsVersion": 20,
+    "appPort": 3000,
+    "siteUser": "nodeuser",
+    "created_at": "2025-06-22T12:00:00Z"
+  }
+}</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="endpoint-group">
-                <h2>🔒 Let's Encrypt SSL</h2>
-                
-                <div class="endpoint">
-                    <div class="endpoint-header">
-                        <span class="method post">POST</span>
-                        <span class="path">/api/letsencrypt/install</span>
-                        <button class="toggle-btn" data-toggle="details">Show Details</button>
-                    </div>
-                    <div class="description">Install SSL certificate from Let's Encrypt</div>
+                <!-- Let's Encrypt SSL Section -->
+                <div class="mb-12" id="letsencrypt">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🔒 Let's Encrypt SSL</h2>
                     
-                    <div class="details">
-                        <div class="section">
-                            <h4>Headers</h4>
-                            <div class="code-block">{
-  "Content-Type": "application/json",
-  "X-API-Key": "your-api-key-here"
-}</div>
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/letsencrypt/install-certificate</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
                         </div>
-
-                        <div class="section">
-                            <h4>Request Body</h4>
-                            <div class="code-block">{
-  "domain": "example.com",
-  "email": "admin@example.com",
-  "challenge_type": "http-01",
-  "force_renewal": false
-}</div>
-                            <table class="param-table">
-                                <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-                                <tr><td>domain</td><td>string</td><td class="required">Required</td><td>Domain for SSL certificate</td></tr>
-                                <tr><td>email</td><td>string</td><td class="required">Required</td><td>Email for Let's Encrypt registration</td></tr>
-                                <tr><td>challenge_type</td><td>string</td><td class="optional">Optional</td><td>Challenge type: http-01, dns-01</td></tr>
-                                <tr><td>force_renewal</td><td>boolean</td><td class="optional">Optional</td><td>Force certificate renewal</td></tr>
-                            </table>
-                        </div>
-
-                        <div class="section">
-                            <h4>Response Example</h4>
-                            <div class="code-block">{
+                        <p class="text-gray-600 italic mb-4">Install SSL certificate from Let's Encrypt</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "example.com",
+  "subjectAlternativeName": "www.example.com"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
-  "message": "SSL certificate installed successfully",
+  "message": "Let's Encrypt certificate installed successfully",
   "data": {
-    "domain": "example.com",
-    "certificate_path": "/etc/letsencrypt/live/example.com/fullchain.pem",
-    "private_key_path": "/etc/letsencrypt/live/example.com/privkey.pem",
-    "expires_at": "2025-09-17T12:00:00Z",
-    "auto_renewal": true,
-    "installed_at": "2025-06-17T12:00:00Z"
+    "domainName": "example.com",
+    "expires_at": "2025-09-22T12:00:00Z",
+    "installed_at": "2025-06-22T12:00:00Z"
   }
-}</div>
+}</pre>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="section">
-                            <h4>cURL Example</h4>
-                            <div class="code-block">curl -X POST "<%= baseUrl %>/api/letsencrypt/install" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
-    "domain": "example.com",
-    "email": "admin@example.com"
-  }'</div>
+                <!-- VHost Templates Section -->
+                <div class="mb-12" id="vhost-templates">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">📄 VHost Templates</h2>
+                    
+                    <!-- List Templates -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
+                                <span class="font-mono font-bold text-gray-800">/api/vhost-templates/list</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">List all available vhost templates</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Headers</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "X-API-Key": "your-api-key-here"
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Vhost templates retrieved successfully",
+  "data": [
+    {
+      "name": "Laravel 12",
+      "description": "Laravel framework template"
+    },
+    {
+      "name": "WordPress",
+      "description": "WordPress CMS template"
+    }
+  ]
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Import Templates -->
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/vhost-templates/import</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Import vhost templates from GitHub repository</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">No body required</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Vhost templates imported successfully",
+  "data": {
+    "imported_templates": 15,
+    "imported_at": "2025-06-22T12:00:00Z"
+  }
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Setup Section -->
+                <div class="mb-12" id="setup">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">⚙️ Laravel Setup</h2>
+                    
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-purple-500">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span class="font-mono font-bold text-gray-800">/api/setup</span>
+                            </div>
+                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                                Show Details
+                            </button>
+                        </div>
+                        <p class="text-gray-600 italic mb-4">Setup a complete Laravel site with PHP and database</p>
+                        
+                        <div class="details hidden">
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "domainName": "laravel-app.com",
+  "phpVersion": "8.3",
+  "vhostTemplate": "Laravel 12",
+  "siteUser": "laraveluser",
+  "siteUserPassword": "secure-password-123",
+  "databaseName": "laravel_db",
+  "databaseUserName": "laravel_user",
+  "databaseUserPassword": "db-password-123",
+  "repositoryUrl": "https://github.com/user/laravel-app.git",
+  "runMigrations": true,
+  "runSeeders": true,
+  "optimizeCache": true,
+  "installComposer": true
+}</pre>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
+                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+  "success": true,
+  "message": "Laravel setup completed successfully",
+  "timestamp": "2025-06-22T12:00:00Z"
+}</pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -678,25 +795,23 @@
     </div>
 
     <script>
-        // Wait for DOM to be ready
-        document.addEventListener('DOMContentLoaded', function() {
-            // Toggle details functionality
-            const toggleButtons = document.querySelectorAll('.toggle-btn[data-toggle="details"]');
+        // Toggle details functionality
+        function toggleDetails(button) {
+            const details = button.closest('.bg-gray-50').querySelector('.details');
+            const isHidden = details.classList.contains('hidden');
             
-            toggleButtons.forEach(function(button) {
-                button.addEventListener('click', function() {
-                    const details = this.closest('.endpoint').querySelector('.details');
-                    const isShowing = details.classList.contains('show');
-                    
-                    if (isShowing) {
-                        details.classList.remove('show');
-                        this.textContent = 'Show Details';
-                    } else {
-                        details.classList.add('show');
-                        this.textContent = 'Hide Details';
-                    }
-                });
-            });
+            if (isHidden) {
+                details.classList.remove('hidden');
+                button.textContent = 'Hide Details';
+            } else {
+                details.classList.add('hidden');
+                button.textContent = 'Show Details';
+            }
+        }
+        
+        // Add click handlers when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('CloudPanel API Documentation loaded successfully');
         });
     </script>
 </body>

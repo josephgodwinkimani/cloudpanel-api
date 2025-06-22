@@ -138,8 +138,19 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
+/**
+ * Authentication middleware for web routes
+ */
+const requireAuth = (req, res, next) => {
+  if (!req.session || !req.session.user) {
+    return res.redirect('/auth/login');
+  }
+  next();
+};
+
 module.exports = {
   authenticateApiKey,
+  requireAuth,
   createRateLimit,
   strictRateLimit,
   moderateRateLimit,
