@@ -23,6 +23,7 @@ services:
       - PORT=3000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DISABLE_CSP=true
     volumes:
       - ./logs:/app/logs
       - /usr/local/bin/clpctl:/usr/local/bin/clpctl:ro

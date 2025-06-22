@@ -376,6 +376,49 @@ cd cloudpanel-api
 docker-compose up -d
 ```
 
+### 🌐 HTTP Frontend Mode
+
+If you're experiencing HTTPS/CSP issues or need to force HTTP protocol for frontend development:
+
+#### Quick Start with HTTP
+
+```bash
+# Use the HTTP start script
+./start-http.sh
+```
+
+#### Manual HTTP Configuration
+
+```bash
+# Copy HTTP environment template
+cp .env.http .env
+
+# Or set environment variables manually
+export FORCE_HTTP=true
+export DISABLE_SECURE_COOKIES=true
+export DISABLE_CSP=true
+export NODE_ENV=development
+
+# Start the application
+npm start
+```
+
+#### Docker with HTTP Mode
+
+```bash
+# Use HTTP Docker Compose configuration
+docker-compose -f docker-compose.http.yml up -d
+```
+
+#### HTTP Mode Features
+
+- ✅ **Forces HTTP Protocol** - Redirects HTTPS requests to HTTP
+- ✅ **Disables Secure Cookies** - Allows cookies over HTTP connections
+- ✅ **Disables CSP** - Removes Content Security Policy restrictions
+- ✅ **Frontend Compatible** - Works with HTTP-only frontend applications
+
+> **Note**: HTTP mode is recommended for development only. Use HTTPS in production for security.
+
 ## 📖 API Documentation
 
 ### Base URL

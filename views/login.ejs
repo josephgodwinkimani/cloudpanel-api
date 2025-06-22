@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; form-action 'self' *; connect-src 'self' *;">
     <title>CloudPanel API - Login</title>
     <style>
         * {
@@ -136,7 +137,7 @@
             <div class="success"><%= success %></div>
         <% } %>
         
-        <form action="/auth/login" method="POST">
+        <form id="loginForm" action="/auth/login" method="POST">
             <div class="form-group">
                 <label for="username">Username:</label>
                 <input type="text" id="username" name="username" required>
@@ -149,6 +150,43 @@
             
             <button type="submit" class="btn">Login</button>
         </form>
+        
+        <script>
+            // Force HTTP protocol for form submission
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Get current location but force HTTP protocol
+                var currentUrl = window.location;
+                var httpUrl = 'http://' + currentUrl.host + '/auth/login';
+                
+                // Create new form element
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = httpUrl;
+                
+                // Copy form data
+                var username = document.getElementById('username').value;
+                var password = document.getElementById('password').value;
+                
+                var usernameInput = document.createElement('input');
+                usernameInput.type = 'hidden';
+                usernameInput.name = 'username';
+                usernameInput.value = username;
+                
+                var passwordInput = document.createElement('input');
+                passwordInput.type = 'hidden';
+                passwordInput.name = 'password';
+                passwordInput.value = password;
+                
+                form.appendChild(usernameInput);
+                form.appendChild(passwordInput);
+                
+                // Submit form
+                document.body.appendChild(form);
+                form.submit();
+            });
+        </script>
         
         <div class="create-account">
             <p>Don't have an account? <a href="/auth/create-credential">Create Credential</a></p>
