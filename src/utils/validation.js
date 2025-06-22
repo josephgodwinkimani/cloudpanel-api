@@ -131,8 +131,8 @@ const schemas = {
   // Setup schemas
   setupLaravel: Joi.object({
     domainName: Joi.string().required(),
-    phpVersion: Joi.string().valid('7.4', '8.0', '8.1', '8.2', '8.3', '8.4').default('8.2'),
-    vhostTemplate: Joi.string().default('Laravel 11'),
+    phpVersion: Joi.string().valid('7.4', '8.0', '8.1', '8.2', '8.3', '8.4').default('8.3'),
+    vhostTemplate: Joi.string().default('Laravel 12'),
     siteUser: Joi.string().required(),
     siteUserPassword: Joi.string().min(6).required(),
     databaseName: Joi.string().required(),
@@ -140,7 +140,7 @@ const schemas = {
     databaseUserPassword: Joi.string().min(6).required(),
     repositoryUrl: Joi.string().uri().optional(),
     runMigrations: Joi.boolean().default(true),
-    runSeeders: Joi.boolean().default(false),
+    runSeeders: Joi.boolean().default(true),
     optimizeCache: Joi.boolean().default(true),
     installComposer: Joi.boolean().default(true)
   })

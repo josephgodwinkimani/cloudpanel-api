@@ -81,6 +81,13 @@ router.post(
       const sshResult = await cloudpanelService.copySshKeysToUser(siteUser);
 
       if (!sshResult.success) {
+        try {
+          await cloudpanelService.deleteSite(domainName, true);
+        } catch (cleanupError) {
+          logger.error(
+            `Failed to cleanup site after database error: ${cleanupError.message}`
+          );
+        }
         logger.error(`SSH key copy failed, but continuing with setup`);
         logger.error(`SSH error: ${sshResult.error || "Unknown error"}`);
         // SSH key copy failure is not critical, so we continue but log the error
@@ -98,6 +105,13 @@ router.post(
           );
 
           if (!cloneResult.success) {
+            try {
+              await cloudpanelService.deleteSite(domainName, true);
+            } catch (cleanupError) {
+              logger.error(
+                `Failed to cleanup site after database error: ${cleanupError.message}`
+              );
+            }
             logger.error(
               `Repository clone failed: ${cloneResult.error || "Unknown error"}`
             );
@@ -133,6 +147,13 @@ router.post(
           );
 
           if (!envResult.success) {
+            try {
+              await cloudpanelService.deleteSite(domainName, true);
+            } catch (cleanupError) {
+              logger.error(
+                `Failed to cleanup site after database error: ${cleanupError.message}`
+              );
+            }
             logger.error(
               `Laravel .env configuration failed: ${
                 envResult.error || "Unknown error"
@@ -165,6 +186,13 @@ router.post(
           );
 
           if (!laravelSetupResult.success) {
+            try {
+              await cloudpanelService.deleteSite(domainName, true);
+            } catch (cleanupError) {
+              logger.error(
+                `Failed to cleanup site after database error: ${cleanupError.message}`
+              );
+            }
             logger.error(
               `Laravel setup commands failed: ${
                 laravelSetupResult.error || "Unknown error"
@@ -180,40 +208,40 @@ router.post(
 
       // Return combined result
       const result = {
-        site: siteResult,
-        database: dbResult,
-        sshKeys: sshResult || {
-          success: false,
-          message: "SSH keys not copied",
-        },
-        repository: cloneResult || {
-          success: false,
-          message: "No repository specified",
-        },
-        environment: envResult || {
-          success: false,
-          message: "Laravel .env not configured",
-        },
-        laravelSetup: laravelSetupResult || {
-          success: false,
-          message: "Laravel setup not run",
-        },
-        setup: {
-          domainName,
-          phpVersion,
-          vhostTemplate,
-          siteUser,
-          databaseName,
-          databaseUserName,
-          repositoryUrl: req.body.repositoryUrl || null,
-          message: "Laravel site and database setup completed successfully",
-        },
+        // site: siteResult,
+        // database: dbResult,
+        // sshKeys: sshResult || {
+        //   success: false,
+        //   message: "SSH keys not copied",
+        // },
+        // repository: cloneResult || {
+        //   success: false,
+        //   message: "No repository specified",
+        // },
+        // environment: envResult || {
+        //   success: false,
+        //   message: "Laravel .env not configured",
+        // },
+        // laravelSetup: laravelSetupResult || {
+        //   success: false,
+        //   message: "Laravel setup not run",
+        // },
+        // setup: {
+        //   domainName,
+        //   phpVersion,
+        //   vhostTemplate,
+        //   siteUser,
+        //   databaseName,
+        //   databaseUserName,
+        //   repositoryUrl: req.body.repositoryUrl || null,
+        //   message: "Laravel site and database setup completed successfully",
+        // },
       };
 
       BaseController.sendSuccess(
         res,
-        "Laravel setup completed successfully",
-        result
+        "Laravel setup completed successfully"
+        // result
       );
     } catch (error) {
       logger.error("Failed to setup Laravel site:", error);
