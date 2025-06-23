@@ -2,6 +2,8 @@ const express = require("express");
 const fs = require("fs").promises;
 const path = require("path");
 const { Client } = require("ssh2");
+const { exec } = require('child_process');
+const { promisify } = require('util');
 const logger = require("../utils/logger");
 const { requireAuth } = require("../middleware");
 const cloudpanel = require("../services/cloudpanel");
@@ -1212,8 +1214,21 @@ async function getDirSize(dirPath) {
       const result = await executeSshCommand(command);
       return parseInt(result.output.trim()) || 0;
     } else {
-      // Production mode - Local execution with recursive calculation
-      return await calculateDirSizeRecursive(dirPath);
+      // Production mode - Use native du command for accurate size calculation
+      try {
+        const execAsync = promisify(exec);
+        
+        // Use du command which is more accurate and efficient than recursive JS
+        const { stdout } = await execAsync(`du -sb "${dirPath}" 2>/dev/null || echo "0"`);
+        const size = parseInt(stdout.trim().split('\t')[0]) || 0;
+        
+        logger.debug(`Directory size for ${dirPath}: ${size} bytes`);
+        return size;
+      } catch (duError) {
+        logger.warn(`du command failed for ${dirPath}, falling back to recursive calculation: ${duError.message}`);
+        // Fallback to improved recursive calculation
+        return await calculateDirSizeRecursive(dirPath);
+      }
     }
   } catch (error) {
     logger.warn(
@@ -1223,49 +1238,71 @@ async function getDirSize(dirPath) {
   }
 }
 
-// Recursive function to calculate directory size in production mode
-async function calculateDirSizeRecursive(dirPath, maxDepth = 3, currentDepth = 0) {
+// Improved recursive function to calculate directory size in production mode
+async function calculateDirSizeRecursive(dirPath, visitedInodes = new Set()) {
   try {
     let totalSize = 0;
     
-    // Prevent infinite recursion and excessive depth
-    if (currentDepth > maxDepth) {
+    // Get directory stats to check for hardlinks/symlinks
+    let dirStats;
+    try {
+      dirStats = await fs.stat(dirPath);
+      
+      // Prevent infinite loops from hardlinks and circular symlinks
+      const inodeKey = `${dirStats.dev}-${dirStats.ino}`;
+      if (visitedInodes.has(inodeKey)) {
+        logger.debug(`Skipping already visited directory: ${dirPath}`);
+        return 0;
+      }
+      visitedInodes.add(inodeKey);
+    } catch (statError) {
+      logger.warn(`Cannot stat directory ${dirPath}: ${statError.message}`);
       return 0;
     }
     
-    const items = await fs.readdir(dirPath);
+    let items;
+    try {
+      items = await fs.readdir(dirPath);
+    } catch (readError) {
+      logger.warn(`Cannot read directory ${dirPath}: ${readError.message}`);
+      return 0;
+    }
     
-    // Process items in batches to avoid overwhelming the system
-    const batchSize = 50;
-    for (let i = 0; i < Math.min(items.length, 500); i += batchSize) {
-      const batch = items.slice(i, i + batchSize);
-      
-      for (const item of batch) {
+    // Process all items without artificial limitations
+    for (const item of items) {
+      try {
+        const itemPath = path.join(dirPath, item);
+        let stats;
+        
+        // Use lstat to get symlink info without following it
         try {
-          // Skip hidden files and directories for performance
-          if (item.startsWith('.')) {
-            continue;
-          }
-          
-          const itemPath = path.join(dirPath, item);
-          const stats = await fs.stat(itemPath);
-          
-          if (stats.isFile()) {
-            totalSize += stats.size;
-          } else if (stats.isDirectory()) {
-            // Recursively calculate subdirectory size with depth limit
-            const subDirSize = await calculateDirSizeRecursive(itemPath, maxDepth, currentDepth + 1);
-            totalSize += subDirSize;
-          }
-        } catch (err) {
+          stats = await fs.lstat(itemPath);
+        } catch (statError) {
           // Skip files/directories we can't access
           continue;
         }
+        
+        if (stats.isFile()) {
+          totalSize += stats.size;
+        } else if (stats.isDirectory() && !stats.isSymbolicLink()) {
+          // Recursively calculate subdirectory size
+          // Pass the visitedInodes set to prevent infinite loops
+          const subDirSize = await calculateDirSizeRecursive(itemPath, visitedInodes);
+          totalSize += subDirSize;
+        } else if (stats.isSymbolicLink()) {
+          // For symlinks, add the size of the link itself (not the target)
+          totalSize += stats.size;
+        }
+      } catch (err) {
+        // Skip files/directories we can't access
+        logger.debug(`Skipping inaccessible item ${item} in ${dirPath}: ${err.message}`);
+        continue;
       }
     }
     
     return totalSize;
   } catch (error) {
+    logger.warn(`Error in calculateDirSizeRecursive for ${dirPath}: ${error.message}`);
     return 0;
   }
 }
