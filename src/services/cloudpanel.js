@@ -33,12 +33,16 @@ class CloudPanelService {
         sshConfig: {
           host: this.sshConfig.host,
           user: this.sshConfig.user,
-          port: this.sshConfig.port
-        }
+          port: this.sshConfig.port,
+        },
       };
-      
-      logger.failure('cli', 'Invalid SSH configuration for development mode', errorDetails);
-      
+
+      logger.failure(
+        "cli",
+        "Invalid SSH configuration for development mode",
+        errorDetails
+      );
+
       return Promise.reject({
         success: false,
         error: ResponseUtils.formatError({
@@ -52,22 +56,7 @@ class CloudPanelService {
 
     const baseCommand = `${this.clpctlPath} ${command} ${args.join(" ")}`;
 
-    // Log command initiation
-    logger.cli('info', `Initiating CloudPanel CLI command: ${command}`, {
-      command: baseCommand,
-      executionMode: this.isDevelopment ? 'SSH' : 'Local',
-      host: this.sshConfig.host,
-      hasInput: !!options.input
-    });
-
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.cli('info', `SSH Mode: Connecting to ${this.sshConfig.user}@${this.sshConfig.host}:${this.sshConfig.port}`, {
-        command: baseCommand,
-        sshHost: this.sshConfig.host,
-        sshUser: this.sshConfig.user,
-        sshPort: this.sshConfig.port
-      });
-      
       // Use SSH client for development mode
       if (options.input) {
         return this.executeSshCommandWithInput(baseCommand, options.input);
@@ -75,89 +64,92 @@ class CloudPanelService {
         return this.executeSshCommand(baseCommand);
       }
     } else {
-      // Local execution for production
-      logger.cli('info', `Local Mode: Executing command directly on server`, {
-        command: baseCommand,
-        timeout: options.timeout || 120000
-      });
-      
       return new Promise((resolve, reject) => {
         const execOptions = {
           timeout: 120000,
           ...options,
         };
 
-        const childProcess = exec(baseCommand, execOptions, (error, stdout, stderr) => {
-          if (error) {
-            const errorDetails = {
-              command: baseCommand,
-              exitCode: error.code,
-              stdout: stdout,
-              stderr: stderr,
-              errorMessage: error.message,
-              timeout: execOptions.timeout
-            };
-            
-            logger.failure('cli', `CloudPanel CLI command failed: ${command}`, errorDetails);
-            
-            // Parse the error output to extract meaningful error messages
-            const output = stdout + stderr;
-            let parsedError = this.parseErrorMessage(output, error.message);
-            
-            reject({
-              success: false,
-              error: parsedError,
-              command: baseCommand,
-              exitCode: error.code,
-              stdout: stdout,
-              stderr: stderr,
-              fullOutput: output
-            });
-          } else {
-            const successDetails = {
-              command: baseCommand,
-              exitCode: 0,
-              hasStdout: !!stdout,
-              hasStderr: !!stderr,
-              outputLength: stdout ? stdout.length : 0
-            };
-            
-            logger.success('cli', `CloudPanel CLI command completed successfully: ${command}`, successDetails);
-            
-            const result = {
-              success: true,
-              output: stdout || 'Command completed successfully',
-              stderr: stderr,
-              command: baseCommand,
-              exitCode: 0
-            };
-            
-            // Try to parse CLI output if available
-            if (stdout) {
-              try {
-                const parsedOutput = ResponseUtils.parseCliOutput(stdout);
-                resolve(parsedOutput);
-              } catch (parseError) {
-                logger.warning('cli', `Failed to parse CLI output for command: ${command}`, {
-                  command: baseCommand,
-                  parseError: parseError.message,
-                  rawOutput: stdout
-                });
-                // If parsing fails, return raw output
+        const childProcess = exec(
+          baseCommand,
+          execOptions,
+          (error, stdout, stderr) => {
+            if (error) {
+              const errorDetails = {
+                command: baseCommand,
+                exitCode: error.code,
+                stdout: stdout,
+                stderr: stderr,
+                errorMessage: error.message,
+                timeout: execOptions.timeout,
+              };
+
+              logger.failure(
+                "cli",
+                `CloudPanel CLI command failed: ${command}`,
+                errorDetails
+              );
+
+              // Parse the error output to extract meaningful error messages
+              const output = stdout + stderr;
+              let parsedError = this.parseErrorMessage(output, error.message);
+
+              reject({
+                success: false,
+                error: parsedError,
+                command: baseCommand,
+                exitCode: error.code,
+                stdout: stdout,
+                stderr: stderr,
+                fullOutput: output,
+              });
+            } else {
+              const successDetails = {
+                command: baseCommand,
+                exitCode: 0,
+                hasStdout: !!stdout,
+                hasStderr: !!stderr,
+                outputLength: stdout ? stdout.length : 0,
+              };
+
+              logger.success(
+                "cli",
+                `CloudPanel CLI command completed successfully: ${command}`,
+                successDetails
+              );
+
+              const result = {
+                success: true,
+                output: stdout || "Command completed successfully",
+                stderr: stderr,
+                command: baseCommand,
+                exitCode: 0,
+              };
+
+              // Try to parse CLI output if available
+              if (stdout) {
+                try {
+                  const parsedOutput = ResponseUtils.parseCliOutput(stdout);
+                  resolve(parsedOutput);
+                } catch (parseError) {
+                  logger.warning(
+                    "cli",
+                    `Failed to parse CLI output for command: ${command}`,
+                    {
+                      command: baseCommand,
+                      parseError: parseError.message,
+                      rawOutput: stdout,
+                    }
+                  );
+                  // If parsing fails, return raw output
+                  resolve(result);
+                }
+              } else {
                 resolve(result);
               }
-            } else {
-              resolve(result);
             }
           }
-        });
-
-        // Log process start
-        logger.cli('info', `Started local process for command: ${command}`, {
-          command: baseCommand,
-          pid: childProcess.pid,
-          timeout: execOptions.timeout
-        });
+        );
 
         // If input is provided for interactive commands, send it
         if (options.input) {
@@ -203,104 +195,113 @@ class CloudPanelService {
     return new Promise((resolve, reject) => {
       const conn = new Client();
 
-      conn.on('ready', () => {
-        logger.info(`SSH connected to ${this.sshConfig.host}`);
-        
-        conn.exec(command, (err, stream) => {
-          if (err) {
-            conn.end();
-            return reject({
-              success: false,
-              error: ResponseUtils.formatError({
-                error: `SSH exec error: ${err.message}`,
-                stderr: err.message,
-              }),
-              command: command,
-              exitCode: 1,
-            });
-          }
+      conn
+        .on("ready", () => {
+          logger.info(`SSH connected to ${this.sshConfig.host}`);
 
-          let stdout = '';
-          let stderr = '';
-
-          stream.on('close', (code, signal) => {
-            conn.end();
-            
-            // Log all output for debugging
-            logger.info(`SSH command completed with code ${code}`);
-            logger.info(`STDOUT: ${stdout}`);
-            if (stderr) {
-              logger.warn(`STDERR: ${stderr}`);
-            }
-            
-            // Check for specific error patterns even with exit code 0
-            const output = stdout + stderr;
-            const hasError = output.toLowerCase().includes('error') || 
-                           output.toLowerCase().includes('failed') ||
-                           output.includes('This value already exists') ||
-                           output.includes('already exists');
-            
-            if (code !== 0 || hasError) {
-              logger.error(`SSH command failed with code ${code}: ${command}`);
-              reject({
+          conn.exec(command, (err, stream) => {
+            if (err) {
+              conn.end();
+              return reject({
                 success: false,
                 error: ResponseUtils.formatError({
-                  error: hasError ? `Command error detected: ${output.trim()}` : `Command failed with exit code ${code}`,
-                  stderr: stderr || output,
+                  error: `SSH exec error: ${err.message}`,
+                  stderr: err.message,
                 }),
                 command: command,
-                exitCode: code,
-                stdout: stdout,
-                stderr: stderr,
-                fullOutput: output
+                exitCode: 1,
               });
-            } else {
-              logger.info(`SSH command succeeded: ${command}`);
-              const result = {
-                success: true,
-                output: stdout || 'Command completed successfully',
-                stderr: stderr,
-                command: command,
-                exitCode: code
-              };
-              
-              // Try to parse CLI output if available
-              if (stdout) {
-                try {
-                  const parsedOutput = ResponseUtils.parseCliOutput(stdout);
-                  resolve(parsedOutput);
-                } catch (parseError) {
-                  // If parsing fails, return raw output
-                  resolve(result);
-                }
-              } else {
-                resolve(result);
-              }
             }
-          }).on('data', (data) => {
-            stdout += data.toString();
-          }).stderr.on('data', (data) => {
-            stderr += data.toString();
+
+            let stdout = "";
+            let stderr = "";
+
+            stream
+              .on("close", (code, signal) => {
+                conn.end();
+                logger.info(`STDOUT: ${stdout}`);
+                if (stderr) {
+                  logger.warn(`STDERR: ${stderr}`);
+                }
+
+                // Check for specific error patterns even with exit code 0
+                const output = stdout + stderr;
+                const hasError =
+                  output.toLowerCase().includes("error") ||
+                  output.toLowerCase().includes("failed") ||
+                  output.includes("This value already exists") ||
+                  output.includes("already exists");
+
+                if (code !== 0 || hasError) {
+                  logger.error(
+                    `SSH command failed with code ${code}: ${command}`,
+                    output
+                  );
+                  reject({
+                    success: false,
+                    error: ResponseUtils.formatError({
+                      error: hasError
+                        ? `Command error detected: ${output.trim()}`
+                        : `Command failed with exit code ${code}`,
+                      stderr: stderr || output,
+                    }),
+                    command: command,
+                    exitCode: code,
+                    stdout: stdout,
+                    stderr: stderr,
+                    fullOutput: output,
+                  });
+                } else {
+                  logger.info(`SSH command succeeded: ${command}`);
+                  const result = {
+                    success: true,
+                    output: stdout || "Command completed successfully",
+                    stderr: stderr,
+                    command: command,
+                    exitCode: code,
+                  };
+
+                  // Try to parse CLI output if available
+                  if (stdout) {
+                    try {
+                      const parsedOutput = ResponseUtils.parseCliOutput(stdout);
+                      resolve(parsedOutput);
+                    } catch (parseError) {
+                      // If parsing fails, return raw output
+                      resolve(result);
+                    }
+                  } else {
+                    resolve(result);
+                  }
+                }
+              })
+              .on("data", (data) => {
+                stdout += data.toString();
+              })
+              .stderr.on("data", (data) => {
+                stderr += data.toString();
+              });
           });
+        })
+        .on("error", (err) => {
+          logger.error(`SSH connection error: ${err.message}`, err);
+          reject({
+            success: false,
+            error: ResponseUtils.formatError({
+              error: `SSH connection failed: ${err.message}`,
+              stderr: err.message,
+            }),
+            command: command,
+            exitCode: 1,
+          });
+        })
+        .connect({
+          host: this.sshConfig.host,
+          port: this.sshConfig.port,
+          username: this.sshConfig.user,
+          password: this.sshConfig.password,
+          readyTimeout: 30000,
         });
-      }).on('error', (err) => {
-        logger.error(`SSH connection error: ${err.message}`);
-        reject({
-          success: false,
-          error: ResponseUtils.formatError({
-            error: `SSH connection failed: ${err.message}`,
-            stderr: err.message,
-          }),
-          command: command,
-          exitCode: 1,
-        });
-      }).connect({
-        host: this.sshConfig.host,
-        port: this.sshConfig.port,
-        username: this.sshConfig.user,
-        password: this.sshConfig.password,
-        readyTimeout: 30000,
-      });
     });
   }
 
@@ -314,110 +315,117 @@ class CloudPanelService {
     return new Promise((resolve, reject) => {
       const conn = new Client();
 
-      conn.on('ready', () => {
-        logger.info(`SSH connected to ${this.sshConfig.host}`);
-        
-        conn.exec(command, (err, stream) => {
-          if (err) {
-            conn.end();
-            return reject({
-              success: false,
-              error: ResponseUtils.formatError({
-                error: `SSH exec error: ${err.message}`,
-                stderr: err.message,
-              }),
-              command: command,
-              exitCode: 1,
-            });
-          }
-
-          let stdout = '';
-          let stderr = '';
-
-          // Send input if provided
-          if (input) {
-            stream.write(input);
-            stream.end();
-          }
-
-          stream.on('close', (code, signal) => {
-            conn.end();
-            
-            // Log all output for debugging
-            logger.info(`SSH command with input completed with code ${code}`);
-            logger.info(`STDOUT: ${stdout}`);
-            if (stderr) {
-              logger.warn(`STDERR: ${stderr}`);
-            }
-            
-            // Check for specific error patterns even with exit code 0
-            const output = stdout + stderr;
-            const hasError = output.toLowerCase().includes('error') || 
-                           output.toLowerCase().includes('failed') ||
-                           output.includes('This value already exists') ||
-                           output.includes('already exists');
-            
-            if (code !== 0 || hasError) {
-              logger.error(`SSH command failed with code ${code}: ${command}`);
-              reject({
+      conn
+        .on("ready", () => {
+          conn.exec(command, (err, stream) => {
+            if (err) {
+              conn.end();
+              return reject({
                 success: false,
                 error: ResponseUtils.formatError({
-                  error: hasError ? `Command error detected: ${output.trim()}` : `Command failed with exit code ${code}`,
-                  stderr: stderr || output,
+                  error: `SSH exec error: ${err.message}`,
+                  stderr: err.message,
                 }),
                 command: command,
-                exitCode: code,
-                stdout: stdout,
-                stderr: stderr,
-                fullOutput: output
+                exitCode: 1,
               });
-            } else {
-              logger.info(`SSH command succeeded: ${command}`);
-              const result = {
-                success: true,
-                output: stdout || 'Command completed successfully',
-                stderr: stderr,
-                command: command,
-                exitCode: code
-              };
-              
-              // Try to parse CLI output if available
-              if (stdout) {
-                try {
-                  const parsedOutput = ResponseUtils.parseCliOutput(stdout);
-                  resolve(parsedOutput);
-                } catch (parseError) {
-                  // If parsing fails, return raw output
-                  resolve(result);
-                }
-              } else {
-                resolve(result);
-              }
             }
-          }).on('data', (data) => {
-            stdout += data.toString();
-          }).stderr.on('data', (data) => {
-            stderr += data.toString();
+
+            let stdout = "";
+            let stderr = "";
+
+            // Send input if provided
+            if (input) {
+              stream.write(input);
+              stream.end();
+            }
+
+            stream
+              .on("close", (code, signal) => {
+                conn.end();
+                logger.info(`STDOUT: ${stdout}`);
+                if (stderr) {
+                  logger.warn(`STDERR: ${stderr}`);
+                }
+
+                // Check for specific error patterns even with exit code 0
+                const output = stdout + stderr;
+                const hasError =
+                  output.toLowerCase().includes("error") ||
+                  output.toLowerCase().includes("failed") ||
+                  output.includes("This value already exists") ||
+                  output.includes("already exists");
+
+                if (code !== 0 || hasError) {
+                  logger.error(
+                    `SSH command failed with code ${code}: ${command}`,
+                    output
+                  );
+                  reject({
+                    success: false,
+                    error: ResponseUtils.formatError({
+                      error: hasError
+                        ? `Command error detected: ${output.trim()}`
+                        : `Command failed with exit code ${code}`,
+                      stderr: stderr || output,
+                    }),
+                    command: command,
+                    exitCode: code,
+                    stdout: stdout,
+                    stderr: stderr,
+                    fullOutput: output,
+                  });
+                } else {
+                  logger.info(`SSH command succeeded: ${command}`);
+                  const result = {
+                    success: true,
+                    output: stdout || "Command completed successfully",
+                    stderr: stderr,
+                    command: command,
+                    exitCode: code,
+                  };
+
+                  // Try to parse CLI output if available
+                  if (stdout) {
+                    try {
+                      const parsedOutput = ResponseUtils.parseCliOutput(stdout);
+                      resolve(parsedOutput);
+                    } catch (parseError) {
+                      // If parsing fails, return raw output
+                      resolve(result);
+                    }
+                  } else {
+                    resolve(result);
+                  }
+                }
+              })
+              .on("data", (data) => {
+                stdout += data.toString();
+              })
+              .stderr.on("data", (data) => {
+                stderr += data.toString();
+              });
           });
+        })
+        .on("error", (err) => {
+          logger.error(`SSH connection error: ${err.message}`, err);
+          reject({
+            success: false,
+            error: ResponseUtils.formatError({
+              error: `SSH connection failed: ${err.message}`,
+              stderr: err.message,
+            }),
+            command: command,
+            exitCode: 1,
+          });
+        })
+        .connect({
+          host: this.sshConfig.host,
+          port: this.sshConfig.port,
+          username: this.sshConfig.user,
+          password: this.sshConfig.password,
+          readyTimeout: 30000,
         });
-      }).on('error', (err) => {
-        logger.error(`SSH connection error: ${err.message}`);
-        reject({
-          success: false,
-          error: ResponseUtils.formatError({
-            error: `SSH connection failed: ${err.message}`,
-            stderr: err.message,
-          }),
-          command: command,
-          exitCode: 1,
-        });
-      }).connect({
-        host: this.sshConfig.host,
-        port: this.sshConfig.port,
-        username: this.sshConfig.user,
-        password: this.sshConfig.password,
-        readyTimeout: 30000,
-      });
     });
   }
 
@@ -456,55 +464,61 @@ class CloudPanelService {
    * @param {string} defaultError - Default error message if no pattern matches
    * @returns {string} - Parsed error message
    */
-  parseErrorMessage(output, defaultError = 'Command failed') {
+  parseErrorMessage(output, defaultError = "Command failed") {
     // Check for specific error patterns
-    if (output.includes('This value already exists') || output.includes('already exists')) {
-      if (output.includes('domainName')) {
-        return 'domainName: This value already exists.';
-      } else if (output.includes('databaseName')) {
-        return 'databaseName: This value already exists.';
-      } else if (output.includes('databaseUserName')) {
-        return 'databaseUserName: This value already exists.';
-      } else if (output.includes('userName')) {
-        return 'userName: This value already exists.';
-      } else if (output.includes('siteUser')) {
-        return 'siteUser: This value already exists.';
+    if (
+      output.includes("This value already exists") ||
+      output.includes("already exists")
+    ) {
+      if (output.includes("domainName")) {
+        return "domainName: This value already exists.";
+      } else if (output.includes("databaseName")) {
+        return "databaseName: This value already exists.";
+      } else if (output.includes("databaseUserName")) {
+        return "databaseUserName: This value already exists.";
+      } else if (output.includes("userName")) {
+        return "userName: This value already exists.";
+      } else if (output.includes("siteUser")) {
+        return "siteUser: This value already exists.";
       } else {
         // Extract the specific field from clpctl output
-        const lines = output.split('\n');
+        const lines = output.split("\n");
         for (const line of lines) {
-          if (line.includes(': This value already exists') || line.includes(': already exists')) {
+          if (
+            line.includes(": This value already exists") ||
+            line.includes(": already exists")
+          ) {
             return line.trim();
           }
         }
-        return 'This value already exists.';
+        return "This value already exists.";
       }
-    } else if (output.includes('Invalid PHP version')) {
-      return 'phpVersion: Invalid PHP version specified.';
-    } else if (output.includes('Template not found')) {
-      return 'vhostTemplate: Template not found.';
-    } else if (output.includes('Domain not found')) {
-      return 'domainName: Domain not found.';
-    } else if (output.includes('Invalid database name')) {
-      return 'databaseName: Invalid database name.';
-    } else if (output.includes('Invalid username')) {
-      return 'userName: Invalid username.';
-    } else if (output.toLowerCase().includes('error')) {
+    } else if (output.includes("Invalid PHP version")) {
+      return "phpVersion: Invalid PHP version specified.";
+    } else if (output.includes("Template not found")) {
+      return "vhostTemplate: Template not found.";
+    } else if (output.includes("Domain not found")) {
+      return "domainName: Domain not found.";
+    } else if (output.includes("Invalid database name")) {
+      return "databaseName: Invalid database name.";
+    } else if (output.includes("Invalid username")) {
+      return "userName: Invalid username.";
+    } else if (output.toLowerCase().includes("error")) {
       // Try to extract error message from output
       const errorMatch = output.match(/error[:\s]+(.+?)[\n\r]/i);
       if (errorMatch) {
         return errorMatch[1].trim();
       } else {
         // Look for lines that contain error information
-        const lines = output.split('\n');
+        const lines = output.split("\n");
         for (const line of lines) {
-          if (line.toLowerCase().includes('error') && line.trim()) {
+          if (line.toLowerCase().includes("error") && line.trim()) {
             return line.trim();
           }
         }
       }
     }
-    
+
     // If no specific pattern matches, return the output or default error
     return output.trim() || defaultError;
   }
@@ -519,16 +533,20 @@ class CloudPanelService {
    */
   handleSshResult(code, stdout, stderr, command) {
     const output = stdout + stderr;
-    const hasError = output.toLowerCase().includes('error') || 
-                   output.toLowerCase().includes('failed') ||
-                   output.includes('This value already exists') ||
-                   output.includes('already exists');
-    
+    const hasError =
+      output.toLowerCase().includes("error") ||
+      output.toLowerCase().includes("failed") ||
+      output.includes("This value already exists") ||
+      output.includes("already exists");
+
     if (code !== 0 || hasError) {
       logger.error(`SSH command failed with code ${code}: ${command}`);
-      
-      const parsedError = this.parseErrorMessage(output, `Command failed with exit code ${code}`);
-      
+
+      const parsedError = this.parseErrorMessage(
+        output,
+        `Command failed with exit code ${code}`
+      );
+
       return {
         success: false,
         error: parsedError,
@@ -536,18 +554,17 @@ class CloudPanelService {
         exitCode: code,
         stdout: stdout,
         stderr: stderr,
-        fullOutput: output
+        fullOutput: output,
       };
     } else {
-      logger.info(`SSH command succeeded: ${command}`);
       const result = {
         success: true,
-        output: stdout || 'Command completed successfully',
+        output: stdout || "Command completed successfully",
         stderr: stderr,
         command: command,
-        exitCode: code
+        exitCode: code,
       };
-      
+
       // Try to parse CLI output if available
       if (stdout) {
         try {
@@ -816,11 +833,15 @@ class CloudPanelService {
         phpVersion,
         vhostTemplate,
         siteUser,
-        sshConfig: this.sshConfig
+        sshConfig: this.sshConfig,
       };
-      
-      logger.failure('site', 'SSH configuration validation failed for site creation', errorDetails);
-      
+
+      logger.failure(
+        "site",
+        "SSH configuration validation failed for site creation",
+        errorDetails
+      );
+
       return Promise.reject({
         success: false,
         error: ResponseUtils.formatError({
@@ -848,52 +869,52 @@ class CloudPanelService {
       vhostTemplate,
       siteUser,
       command: baseCreateSiteCommand,
-      executionMode: this.isDevelopment ? 'SSH' : 'Local'
+      executionMode: this.isDevelopment ? "SSH" : "Local",
     };
 
-    logger.site('info', `Initiating PHP site creation for domain: ${domainName}`, siteDetails);
-
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.site('info', `SSH Mode: Creating PHP site for ${domainName}`, {
-        ...siteDetails,
-        sshHost: this.sshConfig.host,
-        sshUser: this.sshConfig.user
-      });
-      
       try {
         const result = await this.executeSshCommand(baseCreateSiteCommand);
-        
-        logger.success('site', `PHP site created successfully for domain: ${domainName}`, {
-          domainName,
-          phpVersion,
-          vhostTemplate,
-          siteUser,
-          command: baseCreateSiteCommand,
-          outputLength: result.output ? result.output.length : 0,
-          executionTime: new Date().toISOString()
-        });
-        
+
+        logger.success(
+          "site",
+          `PHP site created successfully for domain: ${domainName}`,
+          {
+            domainName,
+            phpVersion,
+            vhostTemplate,
+            siteUser,
+            command: baseCreateSiteCommand,
+            outputLength: result.output ? result.output.length : 0,
+            executionTime: new Date().toISOString(),
+          }
+        );
+
         return {
           success: true,
           message: `Site created successfully for ${domainName}`,
           output: result.output || result,
           stderr: result.stderr,
           command: baseCreateSiteCommand,
-          fullResult: result
+          fullResult: result,
         };
       } catch (error) {
-        logger.failure('site', `PHP site creation failed for domain: ${domainName}`, {
-          domainName,
-          phpVersion,
-          vhostTemplate,
-          siteUser,
-          error: error.error || error.message || error,
-          command: baseCreateSiteCommand,
-          stdout: error.stdout,
-          stderr: error.stderr,
-          exitCode: error.exitCode
-        });
-        
+        logger.failure(
+          "site",
+          `PHP site creation failed for domain: ${domainName}`,
+          {
+            domainName,
+            phpVersion,
+            vhostTemplate,
+            siteUser,
+            error: error.error || error.message || error,
+            command: baseCreateSiteCommand,
+            stdout: error.stdout,
+            stderr: error.stderr,
+            exitCode: error.exitCode,
+          }
+        );
+
         // Return more detailed error information
         return {
           success: false,
@@ -903,70 +924,79 @@ class CloudPanelService {
           stderr: error.stderr,
           fullOutput: error.fullOutput,
           command: baseCreateSiteCommand,
-          exitCode: error.exitCode
+          exitCode: error.exitCode,
         };
       }
     } else {
-      // Local execution for production
-      logger.site('info', `Local Mode: Creating PHP site for ${domainName}`, siteDetails);
-      
       return new Promise((resolve, reject) => {
-        exec(baseCreateSiteCommand, { timeout: 120000 }, (error, stdout, stderr) => {
-          if (error) {
-            const errorDetails = {
-              domainName,
-              phpVersion,
-              vhostTemplate,
-              siteUser,
-              command: baseCreateSiteCommand,
-              exitCode: error.code,
-              stdout: stdout,
-              stderr: stderr,
-              errorMessage: error.message,
-              fullOutput: stdout + stderr
-            };
-            
-            logger.failure('site', `PHP site creation failed for domain: ${domainName}`, errorDetails);
-            
-            // Parse the error output to extract meaningful error messages
-            const output = stdout + stderr;
-            let parsedError = this.parseErrorMessage(output, error.message);
-            
-            reject({
-              success: false,
-              message: `Site creation failed for ${domainName}`,
-              error: parsedError,
-              command: baseCreateSiteCommand,
-              exitCode: error.code,
-              stdout: stdout,
-              stderr: stderr,
-              fullOutput: output
-            });
-          } else {
-            const successDetails = {
-              domainName,
-              phpVersion,
-              vhostTemplate,
-              siteUser,
-              command: baseCreateSiteCommand,
-              exitCode: 0,
-              outputLength: stdout ? stdout.length : 0,
-              executionTime: new Date().toISOString()
-            };
-            
-            logger.success('site', `PHP site created successfully for domain: ${domainName}`, successDetails);
-            
-            const result = {
-              success: true,
-              message: `Site created successfully for ${domainName}`,
-              output: stdout || 'Command completed successfully',
-              stderr: stderr,
-              command: baseCreateSiteCommand,
-              exitCode: 0
-            };
-            resolve(result);
+        exec(
+          baseCreateSiteCommand,
+          { timeout: 120000 },
+          (error, stdout, stderr) => {
+            if (error) {
+              const errorDetails = {
+                domainName,
+                phpVersion,
+                vhostTemplate,
+                siteUser,
+                command: baseCreateSiteCommand,
+                exitCode: error.code,
+                stdout: stdout,
+                stderr: stderr,
+                errorMessage: error.message,
+                fullOutput: stdout + stderr,
+              };
+
+              logger.failure(
+                "site",
+                `PHP site creation failed for domain: ${domainName}`,
+                errorDetails
+              );
+
+              // Parse the error output to extract meaningful error messages
+              const output = stdout + stderr;
+              let parsedError = this.parseErrorMessage(output, error.message);
+
+              reject({
+                success: false,
+                message: `Site creation failed for ${domainName}`,
+                error: parsedError,
+                command: baseCreateSiteCommand,
+                exitCode: error.code,
+                stdout: stdout,
+                stderr: stderr,
+                fullOutput: output,
+              });
+            } else {
+              const successDetails = {
+                domainName,
+                phpVersion,
+                vhostTemplate,
+                siteUser,
+                command: baseCreateSiteCommand,
+                exitCode: 0,
+                outputLength: stdout ? stdout.length : 0,
+                executionTime: new Date().toISOString(),
+              };
+
+              logger.success(
+                "site",
+                `PHP site created successfully for domain: ${domainName}`,
+                successDetails
+              );
+
+              const result = {
+                success: true,
+                message: `Site created successfully for ${domainName}`,
+                output: stdout || "Command completed successfully",
+                stderr: stderr,
+                command: baseCreateSiteCommand,
+                exitCode: 0,
+              };
+              resolve(result);
+            }
           }
-        });
+        );
       });
     }
   }
@@ -991,11 +1021,15 @@ class CloudPanelService {
         domainName,
         databaseName,
         databaseUserName,
-        sshConfig: this.sshConfig
+        sshConfig: this.sshConfig,
       };
-      
-      logger.failure('database', 'SSH configuration validation failed for database creation', errorDetails);
-      
+
+      logger.failure(
+        "database",
+        "SSH configuration validation failed for database creation",
+        errorDetails
+      );
+
       return Promise.reject({
         success: false,
         error: ResponseUtils.formatError({
@@ -1021,50 +1055,50 @@ class CloudPanelService {
       databaseName,
       databaseUserName,
       command: baseCreateDbCommand,
-      executionMode: this.isDevelopment ? 'SSH' : 'Local'
+      executionMode: this.isDevelopment ? "SSH" : "Local",
     };
 
-    logger.database('info', `Initiating database creation for domain: ${domainName}`, dbDetails);
-
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.database('info', `SSH Mode: Creating database for ${domainName}`, {
-        ...dbDetails,
-        sshHost: this.sshConfig.host,
-        sshUser: this.sshConfig.user
-      });
-      
       try {
         const result = await this.executeSshCommand(baseCreateDbCommand);
-        
-        logger.success('database', `Database created successfully for domain: ${domainName}`, {
-          domainName,
-          databaseName,
-          databaseUserName,
-          command: baseCreateDbCommand,
-          outputLength: result.output ? result.output.length : 0,
-          executionTime: new Date().toISOString()
-        });
-        
+
+        logger.success(
+          "database",
+          `Database created successfully for domain: ${domainName}`,
+          {
+            domainName,
+            databaseName,
+            databaseUserName,
+            command: baseCreateDbCommand,
+            outputLength: result.output ? result.output.length : 0,
+            executionTime: new Date().toISOString(),
+          }
+        );
+
         return {
           success: true,
           message: `Database created successfully for ${domainName}`,
           output: result.output || result,
           stderr: result.stderr,
           command: baseCreateDbCommand,
-          fullResult: result
+          fullResult: result,
         };
       } catch (error) {
-        logger.failure('database', `Database creation failed for domain: ${domainName}`, {
-          domainName,
-          databaseName,
-          databaseUserName,
-          error: error.error || error.message || error,
-          command: baseCreateDbCommand,
-          stdout: error.stdout,
-          stderr: error.stderr,
-          exitCode: error.exitCode
-        });
-        
+        logger.failure(
+          "database",
+          `Database creation failed for domain: ${domainName}`,
+          {
+            domainName,
+            databaseName,
+            databaseUserName,
+            error: error.error || error.message || error,
+            command: baseCreateDbCommand,
+            stdout: error.stdout,
+            stderr: error.stderr,
+            exitCode: error.exitCode,
+          }
+        );
+
         // Return more detailed error information
         return {
           success: false,
@@ -1074,68 +1108,77 @@ class CloudPanelService {
           stderr: error.stderr,
           fullOutput: error.fullOutput,
           command: baseCreateDbCommand,
-          exitCode: error.exitCode
+          exitCode: error.exitCode,
         };
       }
     } else {
-      // Local execution for production
-      logger.database('info', `Local Mode: Creating database for ${domainName}`, dbDetails);
-      
       return new Promise((resolve, reject) => {
-        exec(baseCreateDbCommand, { timeout: 120000 }, (error, stdout, stderr) => {
-          if (error) {
-            const errorDetails = {
-              domainName,
-              databaseName,
-              databaseUserName,
-              command: baseCreateDbCommand,
-              exitCode: error.code,
-              stdout: stdout,
-              stderr: stderr,
-              errorMessage: error.message,
-              fullOutput: stdout + stderr
-            };
-            
-            logger.failure('database', `Database creation failed for domain: ${domainName}`, errorDetails);
-            
-            // Parse the error output to extract meaningful error messages
-            const output = stdout + stderr;
-            let parsedError = this.parseErrorMessage(output, error.message);
-            
-            reject({
-              success: false,
-              message: `Database creation failed for ${domainName}`,
-              error: parsedError,
-              command: baseCreateDbCommand,
-              exitCode: error.code,
-              stdout: stdout,
-              stderr: stderr,
-              fullOutput: output
-            });
-          } else {
-            const successDetails = {
-              domainName,
-              databaseName,
-              databaseUserName,
-              command: baseCreateDbCommand,
-              exitCode: 0,
-              outputLength: stdout ? stdout.length : 0,
-              executionTime: new Date().toISOString()
-            };
-            
-            logger.success('database', `Database created successfully for domain: ${domainName}`, successDetails);
-            
-            const result = {
-              success: true,
-              message: `Database created successfully for ${domainName}`,
-              output: stdout || 'Command completed successfully',
-              stderr: stderr,
-              command: baseCreateDbCommand,
-              exitCode: 0
-            };
-            resolve(result);
+        exec(
+          baseCreateDbCommand,
+          { timeout: 120000 },
+          (error, stdout, stderr) => {
+            if (error) {
+              const errorDetails = {
+                domainName,
+                databaseName,
+                databaseUserName,
+                command: baseCreateDbCommand,
+                exitCode: error.code,
+                stdout: stdout,
+                stderr: stderr,
+                errorMessage: error.message,
+                fullOutput: stdout + stderr,
+              };
+
+              logger.failure(
+                "database",
+                `Database creation failed for domain: ${domainName}`,
+                errorDetails
+              );
+
+              // Parse the error output to extract meaningful error messages
+              const output = stdout + stderr;
+              let parsedError = this.parseErrorMessage(output, error.message);
+
+              reject({
+                success: false,
+                message: `Database creation failed for ${domainName}`,
+                error: parsedError,
+                command: baseCreateDbCommand,
+                exitCode: error.code,
+                stdout: stdout,
+                stderr: stderr,
+                fullOutput: output,
+              });
+            } else {
+              const successDetails = {
+                domainName,
+                databaseName,
+                databaseUserName,
+                command: baseCreateDbCommand,
+                exitCode: 0,
+                outputLength: stdout ? stdout.length : 0,
+                executionTime: new Date().toISOString(),
+              };
+
+              logger.success(
+                "database",
+                `Database created successfully for domain: ${domainName}`,
+                successDetails
+              );
+
+              const result = {
+                success: true,
+                message: `Database created successfully for ${domainName}`,
+                output: stdout || "Command completed successfully",
+                stderr: stderr,
+                command: baseCreateDbCommand,
+                exitCode: 0,
+              };
+              resolve(result);
+            }
           }
-        });
+        );
       });
     }
   }
@@ -1173,9 +1216,6 @@ class CloudPanelService {
     const baseCombinedCommand = commands.join(" && ");
 
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.info(`SSH Mode: Copying SSH keys to user ${siteUser}`);
-      logger.info(`Executing command via SSH: ${baseCombinedCommand}`);
-      
       try {
         const result = await this.executeSshCommand(baseCombinedCommand);
         logger.info(`SSH keys successfully copied to user ${siteUser}`);
@@ -1184,7 +1224,7 @@ class CloudPanelService {
           message: `SSH keys copied to user ${siteUser}`,
           output: result.output || result,
           stderr: result.stderr,
-          fullResult: result
+          fullResult: result,
         };
       } catch (error) {
         logger.error(`SSH key copy failed for user ${siteUser}:`, error);
@@ -1195,41 +1235,45 @@ class CloudPanelService {
           stdout: error.stdout,
           stderr: error.stderr,
           fullOutput: error.fullOutput,
-          exitCode: error.exitCode
+          exitCode: error.exitCode,
         };
       }
     } else {
       // Local execution for production
       return new Promise((resolve, reject) => {
-        exec(baseCombinedCommand, { timeout: 30000 }, (error, stdout, stderr) => {
-          if (error) {
-            logger.error(`SSH key copy failed for user ${siteUser}:`, error);
-            reject({
-              success: false,
-              message: `SSH key copy failed for user ${siteUser}`,
-              error: ResponseUtils.formatError({
-                error: error.message,
-                stderr,
-              }),
-              command: baseCombinedCommand,
-              exitCode: error.code,
-              stdout: stdout,
-              stderr: stderr,
-              fullOutput: stdout + stderr
-            });
-          } else {
-            logger.info(`SSH keys successfully copied to user ${siteUser}`);
-            const result = {
-              success: true,
-              message: `SSH keys copied to user ${siteUser}`,
-              output: stdout || 'Command completed successfully',
-              stderr: stderr,
-              command: baseCombinedCommand,
-              exitCode: 0
-            };
-            resolve(result);
+        exec(
+          baseCombinedCommand,
+          { timeout: 30000 },
+          (error, stdout, stderr) => {
+            if (error) {
+              logger.error(`SSH key copy failed for user ${siteUser}:`, error);
+              reject({
+                success: false,
+                message: `SSH key copy failed for user ${siteUser}`,
+                error: ResponseUtils.formatError({
+                  error: error.message,
+                  stderr,
+                }),
+                command: baseCombinedCommand,
+                exitCode: error.code,
+                stdout: stdout,
+                stderr: stderr,
+                fullOutput: stdout + stderr,
+              });
+            } else {
+              logger.info(`SSH keys successfully copied to user ${siteUser}`);
+              const result = {
+                success: true,
+                message: `SSH keys copied to user ${siteUser}`,
+                output: stdout || "Command completed successfully",
+                stderr: stderr,
+                command: baseCombinedCommand,
+                exitCode: 0,
+              };
+              resolve(result);
+            }
           }
-        });
+        );
       });
     }
   }
@@ -1255,15 +1299,13 @@ class CloudPanelService {
       });
     }
 
-    const sshCommand = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+    const sshCommand =
+      "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
     const sitePath = `/home/${siteUser}/htdocs/${domainName}`;
     const deleteCommand = `rm -rf ${sitePath}/* ${sitePath}/.* 2>/dev/null || true`;
     const baseCommand = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone "${repositoryUrl}" .'`;
 
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.info(`SSH Mode: Cloning repository for ${domainName}`);
-      logger.info(`Executing command via SSH: ${baseCommand}`);
-      
       try {
         const result = await this.executeSshCommand(baseCommand);
         logger.info(`Repository cloned successfully for ${domainName}`);
@@ -1273,7 +1315,7 @@ class CloudPanelService {
           output: result.output || result,
           stderr: result.stderr,
           command: baseCommand,
-          fullResult: result
+          fullResult: result,
         };
       } catch (error) {
         logger.error(`Repository clone failed for ${domainName}:`, error);
@@ -1285,7 +1327,7 @@ class CloudPanelService {
           stderr: error.stderr,
           fullOutput: error.fullOutput,
           command: baseCommand,
-          exitCode: error.exitCode
+          exitCode: error.exitCode,
         };
       }
     } else {
@@ -1305,17 +1347,20 @@ class CloudPanelService {
               exitCode: error.code,
               stdout: stdout,
               stderr: stderr,
-              fullOutput: stdout + stderr
+              fullOutput: stdout + stderr,
             });
           } else {
-            logger.info(`Repository cloned successfully for ${domainName}`);
+            logger.info(
+              `Repository cloned successfully for ${domainName}`,
+              stdout + stderr
+            );
             const result = {
               success: true,
               message: `Repository cloned successfully to ${domainName}`,
-              output: stdout || 'Command completed successfully',
+              output: stdout || "Command completed successfully",
               stderr: stderr,
               command: baseCommand,
-              exitCode: 0
+              exitCode: 0,
             };
             resolve(result);
           }
@@ -1367,9 +1412,6 @@ sed -i "s/^DB_USERNAME=.*/DB_USERNAME=${dbUsername}/" .env &&
 sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
 
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.info(`SSH Mode: Configuring Laravel .env for ${domainName}`);
-      logger.info(`Executing command via SSH: ${baseCommand}`);
-      
       try {
         const result = await this.executeSshCommand(baseCommand);
         logger.info(`Laravel .env configured successfully for ${domainName}`);
@@ -1379,10 +1421,13 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
           output: result.output || result,
           stderr: result.stderr,
           command: baseCommand,
-          fullResult: result
+          fullResult: result,
         };
       } catch (error) {
-        logger.error(`Laravel .env configuration failed for ${domainName}:`, error);
+        logger.error(
+          `Laravel .env configuration failed for ${domainName}:`,
+          error
+        );
         return {
           success: false,
           message: `Laravel .env configuration failed for ${domainName}`,
@@ -1391,7 +1436,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
           stderr: error.stderr,
           fullOutput: error.fullOutput,
           command: baseCommand,
-          exitCode: error.exitCode
+          exitCode: error.exitCode,
         };
       }
     } else {
@@ -1399,7 +1444,10 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
       return new Promise((resolve, reject) => {
         exec(baseCommand, { timeout: 60000 }, (error, stdout, stderr) => {
           if (error) {
-            logger.error(`Laravel .env configuration failed for ${domainName}:`, error);
+            logger.error(
+              `Laravel .env configuration failed for ${domainName}:`,
+              error
+            );
             reject({
               success: false,
               message: `Laravel .env configuration failed for ${domainName}`,
@@ -1411,17 +1459,19 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
               exitCode: error.code,
               stdout: stdout,
               stderr: stderr,
-              fullOutput: stdout + stderr
+              fullOutput: stdout + stderr,
             });
           } else {
-            logger.info(`Laravel .env configured successfully for ${domainName}`);
+            logger.info(
+              `Laravel .env configured successfully for ${domainName}`
+            );
             const result = {
               success: true,
               message: `Laravel .env configured successfully for ${domainName}`,
-              output: stdout || 'Command completed successfully',
+              output: stdout || "Command completed successfully",
               stderr: stderr,
               command: baseCommand,
-              exitCode: 0
+              exitCode: 0,
             };
             resolve(result);
           }
@@ -1491,7 +1541,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
 
     // Create a version of the command without composer install for logging
     const commandsForLogging = [];
-    
+
     // Skip composer install in logging
     if (runMigrations) {
       commandsForLogging.push(`${baseCommand} && php artisan migrate --force'`);
@@ -1507,22 +1557,25 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
       );
     }
 
-    const commandForLogging = commandsForLogging.length > 0 ? commandsForLogging.join(" && ") : "Laravel setup commands (excluding composer install)";
+    const commandForLogging =
+      commandsForLogging.length > 0
+        ? commandsForLogging.join(" && ")
+        : "Laravel setup commands (excluding composer install)";
 
     if (this.isDevelopment && this.sshConfig.host) {
-      logger.info(`SSH Mode: Running Laravel setup for ${domainName}`);
-      logger.info(`Executing command via SSH: ${commandForLogging}`);
-      
       try {
         const result = await this.executeSshCommand(baseFullCommand);
-        logger.info(`Laravel setup completed successfully for ${domainName}`);
+        logger.info(
+          `Laravel setup completed successfully for ${domainName}`,
+          result
+        );
         return {
           success: true,
           message: `Laravel setup completed successfully for ${domainName}`,
           output: result.output || result,
           stderr: result.stderr,
           command: commandForLogging,
-          fullResult: result
+          fullResult: result,
         };
       } catch (error) {
         logger.error(`Laravel setup commands failed for ${domainName}:`, error);
@@ -1534,7 +1587,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
           stderr: error.stderr,
           fullOutput: error.fullOutput,
           command: commandForLogging,
-          exitCode: error.exitCode
+          exitCode: error.exitCode,
         };
       }
     } else {
@@ -1542,7 +1595,10 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
       return new Promise((resolve, reject) => {
         exec(baseFullCommand, { timeout: 180000 }, (error, stdout, stderr) => {
           if (error) {
-            logger.error(`Laravel setup commands failed for ${domainName}:`, error);
+            logger.error(
+              `Laravel setup commands failed for ${domainName}:`,
+              error
+            );
             reject({
               success: false,
               message: `Laravel setup commands failed for ${domainName}`,
@@ -1554,18 +1610,21 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
               exitCode: error.code,
               stdout: stdout,
               stderr: stderr,
-              fullOutput: stdout + stderr
+              fullOutput: stdout + stderr,
             });
           } else {
-            logger.info(`Laravel setup completed successfully for ${domainName}`);
             const result = {
               success: true,
               message: `Laravel setup completed successfully for ${domainName}`,
-              output: stdout || 'Command completed successfully',
+              output: stdout || "Command completed successfully",
               stderr: stderr,
               command: commandForLogging,
-              exitCode: 0
+              exitCode: 0,
             };
+            logger.info(
+              `Laravel setup completed successfully for ${domainName}`,
+              result
+            );
             resolve(result);
           }
         });

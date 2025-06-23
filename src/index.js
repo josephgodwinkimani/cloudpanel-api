@@ -7,6 +7,7 @@ const session = require("express-session");
 const path = require("path");
 const logger = require("./utils/logger");
 const SessionStore = require("./utils/sessionStore");
+const queueManager = require("./services/queueManager");
 const {
   authenticateApiKey,
   createRateLimit,
@@ -129,14 +130,6 @@ async function initializeApp() {
 
   // API authentication (optional in development)
   app.use("/api/", authenticateApiKey);
-
-  // Application startup logging
-  logger.logAction('info', 'startup', 'CloudPanel API application starting up', {
-    port: PORT,
-    nodeEnv: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-    pid: process.pid
-  });
 
   // API routes (these need session middleware)
   app.use("/api/cloudflare", cloudflareRoutes);
@@ -292,21 +285,15 @@ module.exports = app;
 
 // Graceful shutdown handler
 process.on("SIGINT", async () => {
-  logger.logAction('info', 'shutdown', 'Received SIGINT, shutting down gracefully...', {
-    signal: 'SIGINT',
-    timestamp: new Date().toISOString(),
-    pid: process.pid
-  });
+  logger.info('Shutting down application...');
+  queueManager.stopWorker();
   await sessionStore.close();
   process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
-  logger.logAction('info', 'shutdown', 'Received SIGTERM, shutting down gracefully...', {
-    signal: 'SIGTERM',
-    timestamp: new Date().toISOString(),
-    pid: process.pid
-  });
+  logger.info('Shutting down application...');
+  queueManager.stopWorker();
   await sessionStore.close();
   process.exit(0);
 });
@@ -315,30 +302,21 @@ process.on("SIGTERM", async () => {
 if (require.main === module) {
   initializeApp()
     .then(() => {
+      // Initialize queue manager
+      logger.info('Initializing queue manager...');
+      queueManager.initialize();
+      
       app.listen(PORT, () => {
-        logger.success('startup', `CloudPanel API server started successfully on port ${PORT}`, {
-          port: PORT,
-          environment: process.env.NODE_ENV || "development",
-          timestamp: new Date().toISOString(),
-          pid: process.pid,
-          httpMode: true,
-          deployment: 'VPS optimized'
-        });
-        
-        // Always log HTTP mode since we're forcing HTTP-only deployment
-        logger.logAction('info', 'startup', '🌐 Running in HTTP mode - optimized for VPS deployment', {
-          protocol: 'HTTP',
-          httpsRedirect: false,
-          secureHeaders: false
-        });
-        logger.info("📡 COOP/COEP headers disabled to prevent browser warnings");
-        logger.info(`� Access the application at: http://your-vps-ip:${PORT}`);
-        logger.info(`🌐 Health check available at: http://your-vps-ip:${PORT}/health`);
-        logger.info(`📚 API documentation at: http://your-vps-ip:${PORT}/docs`);
+        logger.info(`Server running on port ${PORT}`);
+        logger.info('Queue management available at:');
+        logger.info('  - POST /api/setup/queue/start');
+        logger.info('  - POST /api/setup/queue/stop');
+        logger.info('  - POST /api/setup/queue/restart');
+        logger.info('  - GET /api/setup/queue/status');
       });
     })
     .catch((error) => {
-      logger.error("Failed to initialize application:", error);
+      logger.error('Failed to start application:', error);
       process.exit(1);
     });
 }

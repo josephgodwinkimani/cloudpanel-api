@@ -4,96 +4,95 @@ const path = require("path");
 const { Client } = require("ssh2");
 const logger = require("../utils/logger");
 const { requireAuth } = require("../middleware");
+const cloudpanel = require("../services/cloudpanel");
+const databaseService = require("../services/database");
 
 const router = express.Router();
 
 // Framework mapping table for standardized naming
 const FRAMEWORK_TYPES = {
   // PHP Frameworks
-  'Laravel': { type: 'PHP', framework: 'Laravel' },
-  'Symfony': { type: 'PHP', framework: 'Symfony' },
-  'CodeIgniter': { type: 'PHP', framework: 'CodeIgniter' },
-  'CakePHP': { type: 'PHP', framework: 'CakePHP' },
-  'Zend': { type: 'PHP', framework: 'Zend' },
-  'Yii': { type: 'PHP', framework: 'Yii' },
-  'Phalcon': { type: 'PHP', framework: 'Phalcon' },
-  'Slim': { type: 'PHP', framework: 'Slim' },
-  'Lumen': { type: 'PHP', framework: 'Lumen' },
-  
+  Laravel: { type: "PHP", framework: "Laravel" },
+  Symfony: { type: "PHP", framework: "Symfony" },
+  CodeIgniter: { type: "PHP", framework: "CodeIgniter" },
+  CakePHP: { type: "PHP", framework: "CakePHP" },
+  Zend: { type: "PHP", framework: "Zend" },
+  Yii: { type: "PHP", framework: "Yii" },
+  Phalcon: { type: "PHP", framework: "Phalcon" },
+  Slim: { type: "PHP", framework: "Slim" },
+  Lumen: { type: "PHP", framework: "Lumen" },
+
   // CMS
-  'WordPress': { type: 'CMS', framework: 'WordPress' },
-  'Drupal': { type: 'CMS', framework: 'Drupal' },
-  'Joomla': { type: 'CMS', framework: 'Joomla' },
-  'Magento': { type: 'CMS', framework: 'Magento' },
-  'PrestaShop': { type: 'CMS', framework: 'PrestaShop' },
-  'OpenCart': { type: 'CMS', framework: 'OpenCart' },
-  
+  WordPress: { type: "CMS", framework: "WordPress" },
+  Drupal: { type: "CMS", framework: "Drupal" },
+  Joomla: { type: "CMS", framework: "Joomla" },
+  Magento: { type: "CMS", framework: "Magento" },
+  PrestaShop: { type: "CMS", framework: "PrestaShop" },
+  OpenCart: { type: "CMS", framework: "OpenCart" },
+
   // JavaScript/Node.js
-  'Express': { type: 'Node.js', framework: 'Express' },
-  'Next.js': { type: 'React', framework: 'Next.js' },
-  'Nuxt.js': { type: 'Vue.js', framework: 'Nuxt.js' },
-  'Gatsby': { type: 'React', framework: 'Gatsby' },
-  'React': { type: 'JavaScript', framework: 'React' },
-  'Vue.js': { type: 'JavaScript', framework: 'Vue.js' },
-  'Angular': { type: 'JavaScript', framework: 'Angular' },
-  'Svelte': { type: 'JavaScript', framework: 'Svelte' },
-  'Astro': { type: 'JavaScript', framework: 'Astro' },
-  'SvelteKit': { type: 'JavaScript', framework: 'SvelteKit' },
-  'Remix': { type: 'React', framework: 'Remix' },
-  'NestJS': { type: 'Node.js', framework: 'NestJS' },
-  'Fastify': { type: 'Node.js', framework: 'Fastify' },
-  'Koa': { type: 'Node.js', framework: 'Koa' },
-  'Hapi': { type: 'Node.js', framework: 'Hapi' },
-  
+  Express: { type: "Node.js", framework: "Express" },
+  "Next.js": { type: "React", framework: "Next.js" },
+  "Nuxt.js": { type: "Vue.js", framework: "Nuxt.js" },
+  Gatsby: { type: "React", framework: "Gatsby" },
+  React: { type: "JavaScript", framework: "React" },
+  "Vue.js": { type: "JavaScript", framework: "Vue.js" },
+  Angular: { type: "JavaScript", framework: "Angular" },
+  Svelte: { type: "JavaScript", framework: "Svelte" },
+  Astro: { type: "JavaScript", framework: "Astro" },
+  SvelteKit: { type: "JavaScript", framework: "SvelteKit" },
+  Remix: { type: "React", framework: "Remix" },
+  NestJS: { type: "Node.js", framework: "NestJS" },
+  Fastify: { type: "Node.js", framework: "Fastify" },
+  Koa: { type: "Node.js", framework: "Koa" },
+  Hapi: { type: "Node.js", framework: "Hapi" },
+
   // Python
-  'Django': { type: 'Python', framework: 'Django' },
-  'Flask': { type: 'Python', framework: 'Flask' },
-  'FastAPI': { type: 'Python', framework: 'FastAPI' },
-  'Pyramid': { type: 'Python', framework: 'Pyramid' },
-  'Tornado': { type: 'Python', framework: 'Tornado' },
-  'Bottle': { type: 'Python', framework: 'Bottle' },
-  'Sanic': { type: 'Python', framework: 'Sanic' },
-  'Starlette': { type: 'Python', framework: 'Starlette' },
-  
+  Django: { type: "Python", framework: "Django" },
+  Flask: { type: "Python", framework: "Flask" },
+  FastAPI: { type: "Python", framework: "FastAPI" },
+  Pyramid: { type: "Python", framework: "Pyramid" },
+  Tornado: { type: "Python", framework: "Tornado" },
+  Bottle: { type: "Python", framework: "Bottle" },
+  Sanic: { type: "Python", framework: "Sanic" },
+  Starlette: { type: "Python", framework: "Starlette" },
+
   // Other Languages
-  'Ruby on Rails': { type: 'Ruby', framework: 'Rails' },
-  'Sinatra': { type: 'Ruby', framework: 'Sinatra' },
-  'Go': { type: 'Go', framework: 'Go' },
-  'Gin': { type: 'Go', framework: 'Gin' },
-  'Echo': { type: 'Go', framework: 'Echo' },
-  'Fiber': { type: 'Go', framework: 'Fiber' },
-  'Rust': { type: 'Rust', framework: 'Rust' },
-  'Actix': { type: 'Rust', framework: 'Actix' },
-  'Rocket': { type: 'Rust', framework: 'Rocket' },
-  'Warp': { type: 'Rust', framework: 'Warp' },
-  'Phoenix': { type: 'Elixir', framework: 'Phoenix' },
-  
+  "Ruby on Rails": { type: "Ruby", framework: "Rails" },
+  Sinatra: { type: "Ruby", framework: "Sinatra" },
+  Go: { type: "Go", framework: "Go" },
+  Gin: { type: "Go", framework: "Gin" },
+  Echo: { type: "Go", framework: "Echo" },
+  Fiber: { type: "Go", framework: "Fiber" },
+  Rust: { type: "Rust", framework: "Rust" },
+  Actix: { type: "Rust", framework: "Actix" },
+  Rocket: { type: "Rust", framework: "Rocket" },
+  Warp: { type: "Rust", framework: "Warp" },
+  Phoenix: { type: "Elixir", framework: "Phoenix" },
+
   // Static Site Generators
-  'Jekyll': { type: 'Static', framework: 'Jekyll' },
-  'Hugo': { type: 'Static', framework: 'Hugo' },
-  'Hexo': { type: 'Static', framework: 'Hexo' },
-  'VuePress': { type: 'Static', framework: 'VuePress' },
-  'Docusaurus': { type: 'Static', framework: 'Docusaurus' },
-  'GitBook': { type: 'Static', framework: 'GitBook' },
-  'Eleventy': { type: 'Static', framework: 'Eleventy' },
-  '11ty': { type: 'Static', framework: '11ty' },
-  
+  Jekyll: { type: "Static", framework: "Jekyll" },
+  Hugo: { type: "Static", framework: "Hugo" },
+  Hexo: { type: "Static", framework: "Hexo" },
+  VuePress: { type: "Static", framework: "VuePress" },
+  Docusaurus: { type: "Static", framework: "Docusaurus" },
+  GitBook: { type: "Static", framework: "GitBook" },
+  Eleventy: { type: "Static", framework: "Eleventy" },
+  "11ty": { type: "Static", framework: "11ty" },
+
   // Basic Types
-  'PHP': { type: 'PHP', framework: null },
-  'HTML': { type: 'Static', framework: null },
-  'JavaScript': { type: 'JavaScript', framework: null },
-  'Node.js': { type: 'Node.js', framework: null },
-  'Python': { type: 'Python', framework: null },
-  'Static': { type: 'Static', framework: null },
-  'Unknown': { type: 'Unknown', framework: null }
+  PHP: { type: "PHP", framework: null },
+  HTML: { type: "Static", framework: null },
+  JavaScript: { type: "JavaScript", framework: null },
+  "Node.js": { type: "Node.js", framework: null },
+  Python: { type: "Python", framework: null },
+  Static: { type: "Static", framework: null },
+  Unknown: { type: "Unknown", framework: null },
 };
 
 // SSH configuration for development mode
 const isDevelopment = process.env.NODE_ENV === "development";
 const isProduction = process.env.NODE_ENV === "production";
-
-// Log environment mode
-logger.info(`Sites module running in mode: ${process.env.NODE_ENV || 'undefined'} (isDevelopment: ${isDevelopment}, isProduction: ${isProduction})`);
 
 const sshConfig = {
   host: process.env.VPS_HOST || "localhost",
@@ -153,7 +152,6 @@ async function getSshConnection(retryCount = 0) {
     conn
       .on("ready", () => {
         clearTimeout(connectionTimeout);
-        logger.info(`SSH connected to ${sshConfig.host} for sites listing`);
         conn.isConnected = true;
         globalSshConnection = conn;
         connectionPromise = null;
@@ -167,20 +165,12 @@ async function getSshConnection(retryCount = 0) {
 
         // Retry logic for connection failures
         if (retryCount < 2) {
-          logger.warn(
-            `SSH connection failed, retrying... (${retryCount + 1}/3): ${
-              err.message
-            }`
-          );
           setTimeout(() => {
             getSshConnection(retryCount + 1)
               .then(resolve)
               .catch(reject);
           }, 1000 * (retryCount + 1)); // Exponential backoff
         } else {
-          logger.error(
-            `SSH connection failed after 3 attempts: ${err.message}`
-          );
           reject(err);
         }
       })
@@ -359,7 +349,6 @@ router.use(requireAuth);
 // Get all sites from /home directory structure (optimized for SSH)
 async function getSitesList() {
   try {
-    logger.info(`Starting getSitesList - isDevelopment: ${isDevelopment}`);
     const sites = [];
 
     if (isDevelopment) {
@@ -368,12 +357,10 @@ async function getSitesList() {
         throw new Error("Invalid SSH configuration for development mode");
       }
 
-      logger.info("Using SSH mode for sites listing");
-      
       // First, let's debug by checking what directories exist
       const debugCommand = `ls -la /home/`;
       const debugResult = await executeSshCommand(debugCommand);
-      
+
       // Simplified approach - check each known user directory
       const checkUsersCommand = `
         for user_dir in /home/*; do
@@ -383,16 +370,18 @@ async function getSitesList() {
           fi
         done
       `;
-      
+
       const usersResult = await executeSshCommand(checkUsersCommand);
-      const userLines = usersResult.output.split('\n').filter(line => line.startsWith('USER_FOUND:'));
-      
+      const userLines = usersResult.output
+        .split("\n")
+        .filter((line) => line.startsWith("USER_FOUND:"));
+
       for (const userLine of userLines) {
-        const user = userLine.replace('USER_FOUND:', '');
-        
+        const user = userLine.replace("USER_FOUND:", "");
+
         // Skip system directories
-        if (['mysql', 'setup', 'clp'].includes(user)) continue;
-        
+        if (["mysql", "setup", "clp"].includes(user)) continue;
+
         // Check for htdocs and domains
         const domainsCommand = `
           htdocs_path="/home/${user}/htdocs"
@@ -615,17 +604,27 @@ async function getSitesList() {
             done
           fi
         `;
-        
+
         try {
           const domainsResult = await executeSshCommand(domainsCommand);
-          const domainLines = domainsResult.output.split('\n').filter(line => line.startsWith('SITE_DATA|'));
-          
+          const domainLines = domainsResult.output
+            .split("\n")
+            .filter((line) => line.startsWith("SITE_DATA|"));
+
           for (const domainLine of domainLines) {
             try {
-              const parts = domainLine.replace('SITE_DATA|', '').split('|');
+              const parts = domainLine.replace("SITE_DATA|", "").split("|");
               if (parts.length >= 7) {
-                const [userName, domainName, domainPath, siteType, sslStatus, statData, dirSize] = parts;
-                const [mtime, birthtime, size] = statData.split(' ');
+                const [
+                  userName,
+                  domainName,
+                  domainPath,
+                  siteType,
+                  sslStatus,
+                  statData,
+                  dirSize,
+                ] = parts;
+                const [mtime, birthtime, size] = statData.split(" ");
 
                 // Get standardized framework information
                 const frameworkInfo = getFrameworkInfo(siteType);
@@ -635,13 +634,13 @@ async function getSitesList() {
                   user: userName,
                   type: frameworkInfo.type,
                   framework: frameworkInfo.framework,
-                  ssl: sslStatus === 'true',
+                  ssl: sslStatus === "true",
                   path: domainPath,
                   created: new Date(parseInt(birthtime) * 1000),
                   modified: new Date(parseInt(mtime) * 1000),
                   size: parseInt(dirSize) || 0,
                 };
-                
+
                 sites.push(siteInfo);
               }
             } catch (err) {
@@ -653,89 +652,99 @@ async function getSitesList() {
         }
       }
     } else {
-      // Production mode - read sites locally
-      logger.info("Running in production mode - reading sites locally");
       try {
-        let homeDir = '/home';
-        
+        let homeDir = "/home";
+
         // Check if /home directory exists, fallback to alternative paths
         if (!(await pathExists(homeDir))) {
-          logger.warn("Home directory /home does not exist, trying alternatives...");
-          
+          logger.warn(
+            "Home directory /home does not exist, trying alternatives..."
+          );
+
           // Try alternative paths commonly used in different environments
-          const alternatives = ['/var/www/html', '/opt/cloudpanel/home', './data/sites'];
+          const alternatives = [
+            "/var/www/html",
+            "/opt/cloudpanel/home",
+            "./data/sites",
+          ];
           let found = false;
-          
+
           for (const altPath of alternatives) {
             if (await pathExists(altPath)) {
               homeDir = altPath;
               found = true;
-              logger.info(`Using alternative home directory: ${homeDir}`);
               break;
             }
           }
-          
+
           if (!found) {
-            logger.warn("No valid home directory found, returning empty sites list");
+            logger.warn(
+              "No valid home directory found, returning empty sites list"
+            );
             return sites;
           }
         }
-        
+
         const users = await readDirectory(homeDir);
-        logger.info(`Found ${users.length} users in ${homeDir} directory: ${users.join(', ')}`);
-        
+
         for (const user of users) {
           // Skip system directories and common non-user directories
-          if (['mysql', 'setup', 'clp', 'lost+found', '.git'].includes(user) || user.startsWith('.')) {
-            logger.debug(`Skipping system user: ${user}`);
+          if (
+            ["mysql", "setup", "clp", "lost+found", ".git"].includes(user) ||
+            user.startsWith(".")
+          ) {
             continue;
           }
-          
+
           const userPath = path.posix.join(homeDir, user);
-          
+
           // Check different possible site directory structures
-          const possibleSiteDirs = ['htdocs', 'public_html', 'www', 'sites'];
+          const possibleSiteDirs = ["htdocs", "public_html", "www", "sites"];
           let sitesDir = null;
-          
+
           for (const dir of possibleSiteDirs) {
             const candidatePath = path.posix.join(userPath, dir);
             if (await pathExists(candidatePath)) {
               sitesDir = candidatePath;
-              logger.info(`Found sites directory for user ${user}: ${candidatePath}`);
               break;
             }
           }
-          
+
           if (!sitesDir) {
-            logger.debug(`No sites directory found for user ${user}`);
             continue;
           }
-          
+
           try {
             const domains = await readDirectory(sitesDir);
-            logger.info(`Found ${domains.length} domains for user ${user}: ${domains.join(', ')}`);
-            
+
             for (const domain of domains) {
               try {
                 const domainPath = path.posix.join(sitesDir, domain);
-                const domainInfo = await getDomainInfo(domainPath, domain, user);
+                const domainInfo = await getDomainInfo(
+                  domainPath,
+                  domain,
+                  user
+                );
                 sites.push(domainInfo);
-                logger.debug(`Added site: ${domain} (${domainInfo.type})`);
               } catch (err) {
                 // Skip domains we can't access
-                logger.warn(`Cannot access domain ${domain} for user ${user}: ${err.message}`);
+                logger.warn(
+                  `Cannot access domain ${domain} for user ${user}: ${err.message}`
+                );
               }
             }
           } catch (err) {
             // Skip users without sites directory or permission issues
-            logger.warn(`Cannot access sites directory for user ${user}: ${err.message}`);
+            logger.warn(
+              `Cannot access sites directory for user ${user}: ${err.message}`
+            );
           }
         }
-        
-        logger.info(`Total sites found in production: ${sites.length}`);
       } catch (error) {
-        logger.error(`Error reading sites in production mode: ${error.message}`);
-        throw new Error('Failed to read sites directory in production');
+        logger.error(
+          `Error reading sites in production mode: ${error.message}`
+        );
+        throw new Error("Failed to read sites directory in production");
       }
     }
 
@@ -819,7 +828,7 @@ async function detectSiteType(domainPath, files) {
           const result = await executeSshCommand(command);
           return result.output.trim() === "FOUND";
         } else {
-          const content = await fs.readFile(filePath, 'utf-8');
+          const content = await fs.readFile(filePath, "utf-8");
           return content.includes(searchText);
         }
       } catch (err) {
@@ -845,10 +854,12 @@ async function detectSiteType(domainPath, files) {
     // Priority 1: Laravel (most specific PHP framework)
     if (files.includes("artisan") && files.includes("composer.json")) {
       const composerPath = path.posix.join(domainPath, "composer.json");
-      if (await checkFileContent(composerPath, "laravel/framework") ||
-          (await dirExists(path.posix.join(domainPath, "app")) &&
-           await dirExists(path.posix.join(domainPath, "config")) &&
-           await dirExists(path.posix.join(domainPath, "resources")))) {
+      if (
+        (await checkFileContent(composerPath, "laravel/framework")) ||
+        ((await dirExists(path.posix.join(domainPath, "app"))) &&
+          (await dirExists(path.posix.join(domainPath, "config"))) &&
+          (await dirExists(path.posix.join(domainPath, "resources"))))
+      ) {
         return "Laravel";
       } else if (await checkFileContent(composerPath, "lumen")) {
         return "Lumen";
@@ -858,26 +869,41 @@ async function detectSiteType(domainPath, files) {
     }
 
     // Priority 2: WordPress (most common CMS)
-    if (files.includes("wp-config.php") || files.includes("wp-config-sample.php") ||
-        (await dirExists(path.posix.join(domainPath, "wp-content")) &&
-         await dirExists(path.posix.join(domainPath, "wp-includes")))) {
+    if (
+      files.includes("wp-config.php") ||
+      files.includes("wp-config-sample.php") ||
+      ((await dirExists(path.posix.join(domainPath, "wp-content"))) &&
+        (await dirExists(path.posix.join(domainPath, "wp-includes"))))
+    ) {
       return "WordPress";
     }
 
     // Priority 3: Other PHP frameworks via composer.json
     if (files.includes("composer.json")) {
       const composerPath = path.posix.join(domainPath, "composer.json");
-      
-      if (await checkMultiplePatterns(composerPath, ["symfony/framework", "symfony/symfony"])) {
+
+      if (
+        await checkMultiplePatterns(composerPath, [
+          "symfony/framework",
+          "symfony/symfony",
+        ])
+      ) {
         return "Symfony";
       }
-      if (await checkMultiplePatterns(composerPath, ["codeigniter4/framework", "codeigniter/framework"])) {
+      if (
+        await checkMultiplePatterns(composerPath, [
+          "codeigniter4/framework",
+          "codeigniter/framework",
+        ])
+      ) {
         return "CodeIgniter";
       }
       if (await checkFileContent(composerPath, "cakephp/cakephp")) {
         return "CakePHP";
       }
-      if (await checkMultiplePatterns(composerPath, ["zendframework", "laminas"])) {
+      if (
+        await checkMultiplePatterns(composerPath, ["zendframework", "laminas"])
+      ) {
         return "Zend";
       }
       if (await checkFileContent(composerPath, "yiisoft/yii2")) {
@@ -889,7 +915,7 @@ async function detectSiteType(domainPath, files) {
       if (await checkFileContent(composerPath, "slim/slim")) {
         return "Slim";
       }
-      
+
       // If has composer.json but no specific framework, it's still PHP
       return "PHP";
     }
@@ -897,7 +923,7 @@ async function detectSiteType(domainPath, files) {
     // Priority 4: Node.js applications
     if (files.includes("package.json")) {
       const packagePath = path.posix.join(domainPath, "package.json");
-      
+
       if (await checkFileContent(packagePath, '"next"')) return "Next.js";
       if (await checkFileContent(packagePath, '"nuxt"')) return "Nuxt.js";
       if (await checkFileContent(packagePath, '"@remix-run"')) return "Remix";
@@ -907,40 +933,55 @@ async function detectSiteType(domainPath, files) {
       if (await checkFileContent(packagePath, '"koa"')) return "Koa";
       if (await checkFileContent(packagePath, '"@hapi"')) return "Hapi";
       if (await checkFileContent(packagePath, '"express"')) return "Express";
-      if (await checkMultiplePatterns(packagePath, ['"react"', '"@types/react"'])) return "React";
-      if (await checkMultiplePatterns(packagePath, ['"vue"', '"@vue"'])) return "Vue.js";
+      if (
+        await checkMultiplePatterns(packagePath, ['"react"', '"@types/react"'])
+      )
+        return "React";
+      if (await checkMultiplePatterns(packagePath, ['"vue"', '"@vue"']))
+        return "Vue.js";
       if (await checkFileContent(packagePath, '"@angular"')) return "Angular";
-      
+
       if (await checkFileContent(packagePath, '"svelte"')) {
         if (await checkFileContent(packagePath, '"@sveltejs/kit"')) {
           return "SvelteKit";
         }
         return "Svelte";
       }
-      
+
       if (await checkFileContent(packagePath, '"astro"')) return "Astro";
-      if (await checkFileContent(packagePath, '"@11ty/eleventy"')) return "Eleventy";
-      
+      if (await checkFileContent(packagePath, '"@11ty/eleventy"'))
+        return "Eleventy";
+
       return "Node.js";
     }
 
     // Priority 5: Python applications
-    if (files.includes("requirements.txt") || files.includes("Pipfile") || files.includes("pyproject.toml")) {
+    if (
+      files.includes("requirements.txt") ||
+      files.includes("Pipfile") ||
+      files.includes("pyproject.toml")
+    ) {
       if (files.includes("manage.py")) return "Django";
-      
+
       const reqPath = path.posix.join(domainPath, "requirements.txt");
       const pipfilePath = path.posix.join(domainPath, "Pipfile");
-      
-      if (await checkMultiplePatterns(reqPath, ["django", "Django"]) ||
-          await checkMultiplePatterns(pipfilePath, ["django", "Django"])) {
+
+      if (
+        (await checkMultiplePatterns(reqPath, ["django", "Django"])) ||
+        (await checkMultiplePatterns(pipfilePath, ["django", "Django"]))
+      ) {
         return "Django";
       }
-      if (await checkMultiplePatterns(reqPath, ["flask", "Flask"]) ||
-          await checkMultiplePatterns(pipfilePath, ["flask", "Flask"])) {
+      if (
+        (await checkMultiplePatterns(reqPath, ["flask", "Flask"])) ||
+        (await checkMultiplePatterns(pipfilePath, ["flask", "Flask"]))
+      ) {
         return "Flask";
       }
-      if (await checkMultiplePatterns(reqPath, ["fastapi", "FastAPI"]) ||
-          await checkMultiplePatterns(pipfilePath, ["fastapi", "FastAPI"])) {
+      if (
+        (await checkMultiplePatterns(reqPath, ["fastapi", "FastAPI"])) ||
+        (await checkMultiplePatterns(pipfilePath, ["fastapi", "FastAPI"]))
+      ) {
         return "FastAPI";
       }
       if (await checkFileContent(reqPath, "pyramid")) return "Pyramid";
@@ -948,7 +989,7 @@ async function detectSiteType(domainPath, files) {
       if (await checkFileContent(reqPath, "bottle")) return "Bottle";
       if (await checkFileContent(reqPath, "sanic")) return "Sanic";
       if (await checkFileContent(reqPath, "starlette")) return "Starlette";
-      
+
       return "Python";
     }
 
@@ -988,35 +1029,50 @@ async function detectSiteType(domainPath, files) {
     }
 
     // Priority 10: Other CMS by directory structure
-    if (await dirExists(path.posix.join(domainPath, "sites/all")) && files.includes("index.php")) {
+    if (
+      (await dirExists(path.posix.join(domainPath, "sites/all"))) &&
+      files.includes("index.php")
+    ) {
       return "Drupal";
     }
-    if (await dirExists(path.posix.join(domainPath, "administrator")) && 
-        files.includes("index.php") && 
-        await dirExists(path.posix.join(domainPath, "components"))) {
+    if (
+      (await dirExists(path.posix.join(domainPath, "administrator"))) &&
+      files.includes("index.php") &&
+      (await dirExists(path.posix.join(domainPath, "components")))
+    ) {
       return "Joomla";
     }
-    if (await pathExists(path.posix.join(domainPath, "app/etc/local.xml")) ||
-        await pathExists(path.posix.join(domainPath, "app/etc/env.php"))) {
+    if (
+      (await pathExists(path.posix.join(domainPath, "app/etc/local.xml"))) ||
+      (await pathExists(path.posix.join(domainPath, "app/etc/env.php")))
+    ) {
       return "Magento";
     }
-    if (await dirExists(path.posix.join(domainPath, "config")) && 
-        files.includes("index.php") && 
-        await dirExists(path.posix.join(domainPath, "classes"))) {
+    if (
+      (await dirExists(path.posix.join(domainPath, "config"))) &&
+      files.includes("index.php") &&
+      (await dirExists(path.posix.join(domainPath, "classes")))
+    ) {
       return "PrestaShop";
     }
-    if (await dirExists(path.posix.join(domainPath, "system")) && 
-        await dirExists(path.posix.join(domainPath, "catalog")) && 
-        files.includes("index.php")) {
+    if (
+      (await dirExists(path.posix.join(domainPath, "system"))) &&
+      (await dirExists(path.posix.join(domainPath, "catalog"))) &&
+      files.includes("index.php")
+    ) {
       return "OpenCart";
     }
-    if (await dirExists(path.posix.join(domainPath, "system")) &&
-        await dirExists(path.posix.join(domainPath, "application")) && 
-        files.includes("index.php")) {
+    if (
+      (await dirExists(path.posix.join(domainPath, "system"))) &&
+      (await dirExists(path.posix.join(domainPath, "application"))) &&
+      files.includes("index.php")
+    ) {
       return "CodeIgniter";
     }
-    if (await dirExists(path.posix.join(domainPath, "lib/Cake")) ||
-        await dirExists(path.posix.join(domainPath, "cake"))) {
+    if (
+      (await dirExists(path.posix.join(domainPath, "lib/Cake"))) ||
+      (await dirExists(path.posix.join(domainPath, "cake")))
+    ) {
       return "CakePHP";
     }
 
@@ -1024,40 +1080,61 @@ async function detectSiteType(domainPath, files) {
     if (files.includes("_config.yml")) {
       return "Jekyll";
     }
-    if (files.includes("gatsby-config.js") || files.includes("gatsby-config.ts")) {
+    if (
+      files.includes("gatsby-config.js") ||
+      files.includes("gatsby-config.ts")
+    ) {
       return "Gatsby";
     }
-    if (files.includes("docusaurus.config.js") || files.includes("docusaurus.config.ts")) {
+    if (
+      files.includes("docusaurus.config.js") ||
+      files.includes("docusaurus.config.ts")
+    ) {
       return "Docusaurus";
     }
-    if ((files.includes("config.toml") || files.includes("config.yaml") || files.includes("config.yml")) &&
-        await dirExists(path.posix.join(domainPath, "content"))) {
+    if (
+      (files.includes("config.toml") ||
+        files.includes("config.yaml") ||
+        files.includes("config.yml")) &&
+      (await dirExists(path.posix.join(domainPath, "content")))
+    ) {
       return "Hugo";
     }
-    if (await pathExists(path.posix.join(domainPath, ".vuepress/config.js")) ||
-        await dirExists(path.posix.join(domainPath, ".vuepress"))) {
+    if (
+      (await pathExists(path.posix.join(domainPath, ".vuepress/config.js"))) ||
+      (await dirExists(path.posix.join(domainPath, ".vuepress")))
+    ) {
       return "VuePress";
     }
-    if (files.includes(".eleventy.js") || files.includes("eleventy.config.js")) {
+    if (
+      files.includes(".eleventy.js") ||
+      files.includes("eleventy.config.js")
+    ) {
       return "Eleventy";
     }
-    if (files.includes("_config.js") && await dirExists(path.posix.join(domainPath, "source"))) {
+    if (
+      files.includes("_config.js") &&
+      (await dirExists(path.posix.join(domainPath, "source")))
+    ) {
       return "Hexo";
     }
 
     // Priority 12: Basic language detection
-    if (files.includes("index.php") || files.some(file => file.endsWith('.php'))) {
+    if (
+      files.includes("index.php") ||
+      files.some((file) => file.endsWith(".php"))
+    ) {
       return "PHP";
     }
 
     if (files.includes("index.html") || files.includes("index.htm")) {
-      if (files.some(file => file.endsWith('.js'))) {
+      if (files.some((file) => file.endsWith(".js"))) {
         return "JavaScript";
       }
       return "HTML";
     }
 
-    if (files.some(file => file.endsWith('.js'))) {
+    if (files.some((file) => file.endsWith(".js"))) {
       return "JavaScript";
     }
 
@@ -1074,14 +1151,14 @@ function getFrameworkInfo(detectedType) {
   if (frameworkData) {
     return {
       type: frameworkData.type,
-      framework: frameworkData.framework || detectedType
+      framework: frameworkData.framework || detectedType,
     };
   }
-  
+
   // Fallback for unknown types
   return {
     type: detectedType,
-    framework: null
+    framework: null,
   };
 }
 
@@ -1143,6 +1220,25 @@ router.get("/", async (req, res) => {
     });
 
     const sites = await Promise.race([getSitesList(), timeoutPromise]);
+    
+    // Get setup data from database
+    let setupData = [];
+    try {
+      setupData = await databaseService.getAllSetups();
+    } catch (error) {
+      logger.error(`Error getting setup data: ${error.message}`);
+      // Continue without setup data if database is not available
+    }
+
+    // Merge setup data with sites data
+    const sitesWithSetupInfo = sites.map(site => {
+      const setupInfo = setupData.find(setup => setup.domain_name === site.domain);
+      return {
+        ...site,
+        setupInfo: setupInfo || null,
+        hasSetupInfo: !!setupInfo
+      };
+    });
 
     // Helper function for formatting file size
     const formatFileSize = (bytes) => {
@@ -1155,7 +1251,8 @@ router.get("/", async (req, res) => {
 
     res.render("sites", {
       title: "Site Lists",
-      sites: sites,
+      sites: sitesWithSetupInfo,
+      setupData: setupData,
       user: req.session.user,
       baseUrl: `${req.protocol}://${req.get("host")}`,
       formatFileSize: formatFileSize,
@@ -1230,10 +1327,297 @@ router.get("/api/:domain", async (req, res) => {
       data: site,
     });
   } catch (error) {
-    logger.error(`Error getting site details for ${req.params.domain}: ${error.message}`);
+    logger.error(
+      `Error getting site details for ${req.params.domain}: ${error.message}`
+    );
     res.status(500).json({
       success: false,
       message: "Failed to retrieve site details",
+      error: error.message,
+    });
+  }
+});
+
+// API endpoint to delete a site
+router.delete("/api/:domain", requireAuth, async (req, res) => {
+  try {
+    const { domain } = req.params;
+    const { force = true } = req.body; // Optional force parameter from request body
+
+    // Log the deletion attempt
+    logger.info(`Attempting to delete site: ${domain}`);
+
+    // Validate domain parameter
+    if (!domain || typeof domain !== "string" || domain.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid domain parameter",
+        error: "Domain is required and must be a non-empty string",
+      });
+    }
+
+    // Check if site exists before deletion
+    const sites = await getSitesList();
+    const site = sites.find((s) => s.domain === domain);
+
+    if (!site) {
+      return res.status(404).json({
+        success: false,
+        message: "Site not found",
+        error: `No site found with domain: ${domain}`,
+      });
+    }
+
+    // Check if there are setup records for this domain in the database
+    let setupRecords = [];
+    try {
+      const allSetups = await databaseService.getAllSetups();
+      setupRecords = allSetups.filter(setup => setup.domain_name === domain);
+      logger.info(`Found ${setupRecords.length} setup record(s) for domain: ${domain}`);
+    } catch (dbError) {
+      logger.warn(`Failed to check setup records for ${domain}: ${dbError.message}`);
+    }
+
+    // Execute the site deletion using CloudPanel service
+    const result = await cloudpanel.deleteSite(domain, force);
+    console.log(result);
+    
+    if (result.includes("has been deleted")) {
+      logger.success(`Site ${domain} deleted successfully from CloudPanel`);
+      
+      // Also delete setup records from database if they exist
+      let deletedSetupRecords = 0;
+      if (setupRecords.length > 0) {
+        try {
+          for (const setupRecord of setupRecords) {
+            const deletedCount = await databaseService.deleteSetup(setupRecord.id);
+            if (deletedCount > 0) {
+              deletedSetupRecords++;
+              logger.info(`Deleted setup record ID ${setupRecord.id} for domain: ${domain}`);
+            }
+          }
+          
+          if (deletedSetupRecords > 0) {
+            logger.success(`Deleted ${deletedSetupRecords} setup record(s) for domain: ${domain}`);
+          }
+        } catch (dbError) {
+          logger.error(`Failed to delete setup records for ${domain}: ${dbError.message}`);
+          // Continue with success response even if database cleanup fails
+        }
+      }
+
+      // Prepare success response
+      let responseMessage = `Site ${domain} has been deleted successfully`;
+      if (deletedSetupRecords > 0) {
+        responseMessage += ` and ${deletedSetupRecords} related setup record(s) have been removed from database`;
+      }
+
+      res.json({
+        success: true,
+        message: responseMessage,
+        data: {
+          domain: domain,
+          deletedAt: new Date().toISOString(),
+          setupRecordsDeleted: deletedSetupRecords,
+          ...result.data,
+        },
+      });
+    } else {
+      logger.error(`Failed to delete site ${domain}: ${result.error}`);
+      res.status(500).json({
+        success: false,
+        message: `Failed to delete site ${domain}`,
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    logger.error(`Error deleting site ${req.params.domain}: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete site",
+      error: error.message,
+      details: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+});
+
+// Route to display setup history page
+router.get("/setup-history", async (req, res) => {
+  try {
+    const setupData = await databaseService.getAllSetups();
+    
+    // Helper function for formatting file size
+    const formatFileSize = (bytes) => {
+      if (bytes === 0) return "0 Bytes";
+      const k = 1024;
+      const sizes = ["Bytes", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    };
+
+    res.render("setup-history", {
+      title: "Setup History",
+      setupData: setupData,
+      user: req.session.user,
+      baseUrl: `${req.protocol}://${req.get("host")}`,
+      formatFileSize: formatFileSize,
+      process: {
+        env: {
+          VPS_HOST: process.env.VPS_HOST || null,
+          NODE_ENV: process.env.NODE_ENV || 'development'
+        }
+      }
+    });
+  } catch (error) {
+    logger.error(`Error loading setup history: ${error.message}`);
+    res.status(500).render("error", {
+      title: "Error",
+      message: "Failed to load setup history",
+      error: error.message,
+    });
+  }
+});
+
+// API endpoint to get setup history as JSON
+router.get("/api/setup-history", async (req, res) => {
+  try {
+    const setupData = await databaseService.getAllSetups();
+    res.json({
+      success: true,
+      message: "Setup history retrieved successfully",
+      data: setupData,
+      total: setupData.length,
+    });
+  } catch (error) {
+    logger.error(`Error in API setup history: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve setup history",
+      error: error.message,
+    });
+  }
+});
+
+// API endpoint to delete a setup record
+router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { deleteFromCloudPanel = true } = req.body; // Optional parameter to also delete from CloudPanel
+    
+    // Validate ID
+    if (!id || isNaN(parseInt(id))) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid setup ID provided",
+      });
+    }
+
+    // Check if setup exists and get its details
+    const setupData = await databaseService.getAllSetups();
+    const setupToDelete = setupData.find(setup => setup.id === parseInt(id));
+    
+    if (!setupToDelete) {
+      return res.status(404).json({
+        success: false,
+        message: "Setup record not found",
+      });
+    }
+
+    let cloudPanelResult = null;
+    let cloudPanelMessage = "";
+
+    // If requested, also try to delete from CloudPanel
+    if (deleteFromCloudPanel && setupToDelete.domain_name) {
+      try {
+        logger.info(`Attempting to delete site from CloudPanel: ${setupToDelete.domain_name}`);
+        
+        // Try to delete the site from CloudPanel
+        const deleteResult = await cloudpanel.deleteSite(setupToDelete.domain_name, true);
+        
+        if (deleteResult && typeof deleteResult === 'string' && deleteResult.includes("has been deleted")) {
+          cloudPanelResult = { success: true, message: deleteResult };
+          cloudPanelMessage = `Site '${setupToDelete.domain_name}' successfully deleted from CloudPanel.`;
+          logger.success(`Site ${setupToDelete.domain_name} deleted from CloudPanel successfully`);
+        } else if (deleteResult && deleteResult.error) {
+          // Site deletion failed, but continue with database deletion
+          cloudPanelResult = { success: false, error: deleteResult.error };
+          if (deleteResult.error.includes("not found") || 
+              deleteResult.error.includes("does not exist") ||
+              deleteResult.error.includes("No site found")) {
+            cloudPanelMessage = `Site '${setupToDelete.domain_name}' not found in CloudPanel (may have been deleted manually).`;
+          } else {
+            cloudPanelMessage = `Failed to delete site '${setupToDelete.domain_name}' from CloudPanel: ${deleteResult.error}`;
+          }
+          logger.warn(`CloudPanel site deletion warning for ${setupToDelete.domain_name}: ${deleteResult.error}`);
+        } else {
+          cloudPanelResult = { success: false, error: "Unknown response from CloudPanel" };
+          cloudPanelMessage = `Unexpected response when deleting site '${setupToDelete.domain_name}' from CloudPanel.`;
+          logger.warn(`Unexpected CloudPanel response for ${setupToDelete.domain_name}: ${deleteResult}`);
+        }
+      } catch (cloudPanelError) {
+        // CloudPanel deletion failed, but continue with database deletion
+        cloudPanelResult = { success: false, error: cloudPanelError.message };
+        if (cloudPanelError.message && 
+            (cloudPanelError.message.includes("not found") || 
+             cloudPanelError.message.includes("does not exist") ||
+             cloudPanelError.message.includes("No site found"))) {
+          cloudPanelMessage = `Site '${setupToDelete.domain_name}' not found in CloudPanel (may have been deleted manually).`;
+        } else {
+          cloudPanelMessage = `Error deleting site '${setupToDelete.domain_name}' from CloudPanel: ${cloudPanelError.message}`;
+        }
+        logger.error(`CloudPanel deletion error for ${setupToDelete.domain_name}: ${cloudPanelError.message}`);
+      }
+    }
+
+    // Delete the setup record from database
+    const deletedCount = await databaseService.deleteSetup(parseInt(id));
+    
+    if (deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Setup record not found or already deleted from database",
+      });
+    }
+
+    logger.info(`Setup record deleted from database: ID ${id}, Domain: ${setupToDelete.domain_name}`);
+
+    // Prepare response message
+    let responseMessage = "Setup record deleted successfully from database.";
+    if (deleteFromCloudPanel) {
+      responseMessage += ` ${cloudPanelMessage}`;
+    }
+
+    // Prepare response data
+    const responseData = {
+      database: {
+        success: true,
+        message: "Setup record deleted from database successfully",
+        deletedSetup: {
+          id: setupToDelete.id,
+          domain_name: setupToDelete.domain_name,
+          created_at: setupToDelete.created_at
+        }
+      }
+    };
+
+    if (deleteFromCloudPanel) {
+      responseData.cloudPanel = cloudPanelResult || { 
+        success: false, 
+        message: "CloudPanel deletion was not attempted" 
+      };
+    }
+
+    res.json({
+      success: true,
+      message: responseMessage,
+      data: responseData
+    });
+
+  } catch (error) {
+    logger.error(`Error deleting setup record: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete setup record",
       error: error.message,
     });
   }

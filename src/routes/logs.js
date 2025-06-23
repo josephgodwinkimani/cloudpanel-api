@@ -249,7 +249,7 @@ router.get("/api/test-connection", isAuthenticated, async (req, res) => {
 router.post("/api/test-log", isAuthenticated, async (req, res) => {
   try {
     const testMessage = `Test log entry created from logs page at ${new Date().toISOString()}`;
-    logger.info(testMessage);
+    // logger.info(testMessage);
     
     res.json({
       success: true,
@@ -291,9 +291,17 @@ async function getLogs(options = {}) {
     for (const logFile of logFiles) {
       try {
         const logContent = await fs.readFile(logFile.path, 'utf8');
-        const lines = logContent.split('\n').filter(line => line.trim() !== '').slice(-200); // Last 200 lines per file
+        // Split into lines and filter out empty lines
+        const allLines = logContent.split('\n').filter(line => line.trim() !== '');
         
-        for (const line of lines) {
+        // Get the most recent 300 lines to ensure we have fresh data
+        const lines = allLines.slice(-300);
+        
+        // Process lines in reverse order to prioritize newest entries
+        const reversedLines = [...lines].reverse();
+        
+        for (let lineIndex = 0; lineIndex < reversedLines.length; lineIndex++) {
+          const line = reversedLines[lineIndex];
           try {
             // Skip lines that only contain "false" or are just boolean values
             if (line.trim() === 'false' || 
@@ -303,6 +311,16 @@ async function getLogs(options = {}) {
                 line.trim() === '{}' ||
                 line.trim() === '[]' ||
                 line.trim().length < 10) { // Skip very short lines that are likely not real log entries
+              continue;
+            }
+
+            // Skip browser and DevTools related requests
+            if (shouldSkipLogEntry(line)) {
+              continue;
+            }
+
+            // Skip unwanted log entries (Chrome DevTools, browser requests, etc.)
+            if (shouldSkipLogEntry(line)) {
               continue;
             }
             
@@ -321,6 +339,11 @@ async function getLogs(options = {}) {
                   message.trim().length < 5) {
                 continue;
               }
+
+              // Additional check for unwanted messages
+              if (shouldSkipMessage(message)) {
+                continue;
+              }
               
               let parsedDetails = {};
               let parsedMeta = {};
@@ -333,9 +356,23 @@ async function getLogs(options = {}) {
                 if (details) parsedDetails = { raw: details };
                 if (meta) parsedMeta = { raw: meta };
               }
+
+              // Create a more reliable timestamp
+              let logTimestamp;
+              try {
+                logTimestamp = new Date(timestamp).toISOString();
+                // Validate the timestamp
+                if (isNaN(new Date(logTimestamp).getTime())) {
+                  throw new Error('Invalid timestamp');
+                }
+              } catch (e) {
+                // Fallback to current time with slight offset based on line position
+                logTimestamp = new Date(Date.now() - (lineIndex * 1000)).toISOString();
+              }
               
               logs.push({
-                timestamp: new Date(timestamp).toISOString(),
+                id: `${logFile.type}-${Date.now()}-${lineIndex}`, // Unique ID for each log entry
+                timestamp: logTimestamp,
                 level: level.toLowerCase(),
                 action: action || getActionFromMessage(message),
                 message: message,
@@ -345,7 +382,22 @@ async function getLogs(options = {}) {
                 userId: userId,
                 details: parsedDetails,
                 meta: parsedMeta,
-                priority: logFile.priority
+                priority: logFile.priority,
+                formattedTime: new Date(logTimestamp).toLocaleString('en-US', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false
+                }),
+                metadata: {
+                  service: parsedMeta.service || 'cloudpanel-api',
+                  environment: parsedMeta.environment || 'production',
+                  version: parsedMeta.version || '1.0.0',
+                  ip: parsedMeta.ip || 'localhost'
+                }
               });
               totalLogsRead++;
             } else {
@@ -361,9 +413,28 @@ async function getLogs(options = {}) {
                     logEntry.message.trim().length < 5)) {
                   continue;
                 }
+
+                // Additional check for unwanted messages in JSON format
+                if (logEntry.message && shouldSkipMessage(logEntry.message)) {
+                  continue;
+                }
+
+                // Create a more reliable timestamp
+                let logTimestamp;
+                try {
+                  logTimestamp = new Date(logEntry.timestamp || new Date()).toISOString();
+                  // Validate the timestamp
+                  if (isNaN(new Date(logTimestamp).getTime())) {
+                    throw new Error('Invalid timestamp');
+                  }
+                } catch (e) {
+                  // Fallback to current time with slight offset based on line position
+                  logTimestamp = new Date(Date.now() - (lineIndex * 1000)).toISOString();
+                }
                 
                 logs.push({
-                  timestamp: logEntry.timestamp || new Date().toISOString(),
+                  id: `${logFile.type}-json-${Date.now()}-${lineIndex}`,
+                  timestamp: logTimestamp,
                   level: logEntry.level || 'info',
                   action: logEntry.action || getActionFromMessage(logEntry.message),
                   message: logEntry.message || line,
@@ -371,7 +442,22 @@ async function getLogs(options = {}) {
                   source: logFile.path.replace('logs/', '').replace('.log', ''),
                   details: logEntry.details || {},
                   meta: logEntry.meta || {},
-                  priority: logFile.priority
+                  priority: logFile.priority,
+                  formattedTime: new Date(logTimestamp).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                  }),
+                  metadata: {
+                    service: (logEntry.meta && logEntry.meta.service) || 'cloudpanel-api',
+                    environment: (logEntry.meta && logEntry.meta.environment) || 'production',
+                    version: (logEntry.meta && logEntry.meta.version) || '1.0.0',
+                    ip: (logEntry.meta && logEntry.meta.ip) || 'localhost'
+                  }
                 });
                 totalLogsRead++;
               } catch (jsonError) {
@@ -386,15 +472,34 @@ async function getLogs(options = {}) {
                     line.trim().length < 10) {
                   continue;
                 }
+
+                // Create a more reliable timestamp
+                const logTimestamp = new Date(Date.now() - (lineIndex * 1000)).toISOString();
                 
                 logs.push({
-                  timestamp: new Date().toISOString(),
+                  id: `${logFile.type}-raw-${Date.now()}-${lineIndex}`,
+                  timestamp: logTimestamp,
                   level: logFile.type === 'error' ? 'error' : 'info',
                   action: getActionFromMessage(line),
                   message: line,
                   type: logFile.type,
                   source: logFile.path.replace('logs/', '').replace('.log', ''),
-                  priority: logFile.priority
+                  priority: logFile.priority,
+                  formattedTime: new Date(logTimestamp).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                  }),
+                  metadata: {
+                    service: 'cloudpanel-api',
+                    environment: 'production',
+                    version: '1.0.0',
+                    ip: 'localhost'
+                  }
                 });
                 totalLogsRead++;
               }
@@ -426,8 +531,22 @@ async function getLogs(options = {}) {
       logs.push(...mockLogs);
     }
 
-    // Sort logs by timestamp (newest first)
-    let sortedLogs = logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    // Sort logs by timestamp (newest first) with fallback sorting
+    let sortedLogs = logs.sort((a, b) => {
+      const dateA = new Date(a.timestamp);
+      const dateB = new Date(b.timestamp);
+      
+      // Primary sort: by timestamp (newest first)
+      const timeDiff = dateB.getTime() - dateA.getTime();
+      if (timeDiff !== 0) return timeDiff;
+      
+      // Secondary sort: by priority (lower number = higher priority)
+      const priorityDiff = (a.priority || 999) - (b.priority || 999);
+      if (priorityDiff !== 0) return priorityDiff;
+      
+      // Tertiary sort: by ID to ensure consistent ordering
+      return (b.id || '').localeCompare(a.id || '');
+    });
 
     // Apply filters
     if (level) {
@@ -516,6 +635,104 @@ function getActionFromMessage(message) {
   return 'System';
 }
 
+// Helper function to check if a log entry should be skipped
+function shouldSkipLogEntry(logLine) {
+  const lowerLine = logLine.toLowerCase();
+  
+  // Skip Chrome DevTools requests
+  if (lowerLine.includes('.well-known/')) {
+    return true;
+  }
+  
+  // Skip browser favicon requests
+  if (lowerLine.includes('favicon.ico')) {
+    return true;
+  }
+  
+  // Skip browser manifest requests
+  if (lowerLine.includes('manifest.json')) {
+    return true;
+  }
+  
+  // Skip service worker requests
+  if (lowerLine.includes('sw.js') || lowerLine.includes('service-worker')) {
+    return true;
+  }
+  
+  // Skip browser auto-generated requests
+  if (lowerLine.includes('/.well-known/') && 
+      (lowerLine.includes('security.txt') || 
+       lowerLine.includes('robots.txt') || 
+       lowerLine.includes('sitemap.xml'))) {
+    return true;
+  }
+  
+  // Skip health check requests
+  if (lowerLine.includes('/health') || lowerLine.includes('/ping') || lowerLine.includes('/status')) {
+    return true;
+  }
+  
+  // Skip static asset requests that are just noise
+  if (lowerLine.includes('get /css/') || 
+      lowerLine.includes('get /js/') || 
+      lowerLine.includes('get /images/') || 
+      lowerLine.includes('get /assets/')) {
+    return true;
+  }
+  
+  return false;
+}
+
+// Helper function to check if a message should be skipped
+function shouldSkipMessage(message) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Skip Chrome DevTools messages
+  if (lowerMessage.includes('.well-known/appspecific/com.chrome.devtools')) {
+    return true;
+  }
+  
+  // Skip browser-related requests
+  if (lowerMessage.includes('favicon.ico') || 
+      lowerMessage.includes('manifest.json') || 
+      lowerMessage.includes('sw.js') || 
+      lowerMessage.includes('service-worker')) {
+    return true;
+  }
+  
+  // Skip common browser auto-requests
+  if (lowerMessage.includes('robots.txt') || 
+      lowerMessage.includes('sitemap.xml') || 
+      lowerMessage.includes('security.txt')) {
+    return true;
+  }
+  
+  // Skip HEAD requests (usually browser pre-flight)
+  if (lowerMessage.includes('head /') && !lowerMessage.includes('api')) {
+    return true;
+  }
+  
+  // Skip OPTIONS requests (CORS pre-flight)
+  if (lowerMessage.includes('options /')) {
+    return true;
+  }
+  
+  // Skip 404 errors for browser auto-requests
+  if (lowerMessage.includes('404') && 
+      (lowerMessage.includes('.well-known/') || 
+       lowerMessage.includes('favicon') || 
+       lowerMessage.includes('manifest'))) {
+    return true;
+  }
+  
+  // Skip empty or very short messages
+  if (message.trim().length < 10) {
+    return true;
+  }
+  
+  return false;
+}
+
 // Generate mock logs for demonstration when no real logs exist
 function generateMockLogs() {
   const mockActions = [
@@ -533,24 +750,130 @@ function generateMockLogs() {
     { action: "CloudPanel CLI", level: "error", message: "❌ FAILED: Site deletion failed for domain 'test.com' - Domain has active SSL certificate that must be removed first", type: "cli" }
   ];
 
-  return mockActions.map((log, index) => ({
-    timestamp: new Date(Date.now() - (index * 300000)).toISOString(), // 5 minutes apart
-    level: log.level,
-    action: log.action,
-    message: log.message,
-    type: log.type,
-    source: 'mock-data',
-    details: {
-      mockData: true,
-      generated: new Date().toISOString(),
-      index: index
-    },
-    meta: {
-      service: 'cloudpanel-api',
-      environment: 'development',
-      version: '1.0.0'
-    }
-  }));
+  const currentTime = Date.now();
+  
+  return mockActions.map((log, index) => {
+    // Generate timestamps in descending order (newest first)
+    const timestamp = new Date(currentTime - (index * 120000)).toISOString(); // 2 minutes apart
+    
+    return {
+      id: `mock-${index}-${currentTime}`,
+      timestamp: timestamp,
+      level: log.level,
+      action: log.action,
+      message: log.message,
+      type: log.type,
+      source: 'mock-data',
+      formattedTime: new Date(timestamp).toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }),
+      details: {
+        mockData: true,
+        generated: new Date().toISOString(),
+        index: index,
+        requestId: `req-${Math.random().toString(36).substr(2, 9)}`,
+        duration: Math.floor(Math.random() * 1000) + 'ms'
+      },
+      meta: {
+        service: 'cloudpanel-api',
+        environment: 'development',
+        version: '1.0.0',
+        ip: index % 2 === 0 ? '192.168.1.100' : '192.168.1.101',
+        userAgent: 'CloudPanel-API/1.0'
+      },
+      metadata: {
+        service: 'cloudpanel-api',
+        environment: 'development',
+        version: '1.0.0',
+        ip: index % 2 === 0 ? '192.168.1.100' : '192.168.1.101'
+      }
+    };
+  });
+}
+
+// Helper function to check if we should skip this log entry
+function shouldSkipLogEntry(line) {
+  const lowerLine = line.toLowerCase();
+  
+  // Skip Chrome DevTools and browser auto-requests
+  const skipPatterns = [
+    'chrome-devtools://',
+    'devtools://',
+    'chrome-extension://',
+    'moz-extension://',
+    'safari-extension://',
+    'favicon.ico',
+    'manifest.json',
+    'service-worker',
+    'sw.js',
+    'robots.txt',
+    'sitemap.xml',
+    '.map',
+    'sourcemap',
+    '__webpack',
+    'hot-update',
+    'sockjs-node',
+    'ws://localhost',
+    'wss://localhost',
+    'localhost:3000',
+    'localhost:3001',
+    'hmr',
+    'hot-reload',
+    'livereload',
+    'browserify',
+    'parcel-hmr',
+    'vite',
+    '/health',
+    '/ping',
+    '/status',
+    'user-agent: chrome',
+    'user-agent: mozilla',
+    'user-agent: safari',
+    'user-agent: edge',
+    'preflight',
+    'options method',
+    'keep-alive',
+    'connection: close',
+    'accept-encoding: gzip',
+    'cache-control: no-cache'
+  ];
+  
+  return skipPatterns.some(pattern => lowerLine.includes(pattern));
+}
+
+// Helper function to check if we should skip based on message content
+function shouldSkipMessage(message) {
+  if (!message || typeof message !== 'string') return false;
+  
+  const lowerMessage = message.toLowerCase();
+  const skipMessages = [
+    'listening on port',
+    'server started',
+    'connected to database',
+    'middleware loaded',
+    'route registered',
+    'static files served',
+    'cors enabled',
+    'session configured',
+    'environment: development',
+    'environment: production',
+    'nodemon restarting',
+    'app crashed',
+    'waiting for changes',
+    'restarting due to changes',
+    'compiled successfully',
+    'webpack compiled',
+    'hot module replacement',
+    'live reload enabled'
+  ];
+  
+  return skipMessages.some(skipMsg => lowerMessage.includes(skipMsg));
 }
 
 module.exports = router;
