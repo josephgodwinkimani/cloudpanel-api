@@ -2286,7 +2286,7 @@
         const completedSetups = document.querySelectorAll('tr[data-setup-id] .bg-green-100').length;
         
         // Show confirmation dialog with safety information
-        const confirmed = await showDeleteAllErrorsConfirmation(failedSetups.length, totalSetups, completedSetups);
+        const confirmed = await showDeleteAllErrorsConfirmation(failedRows.length, totalSetups, completedSetups);
         if (!confirmed) {
           return;
         }
