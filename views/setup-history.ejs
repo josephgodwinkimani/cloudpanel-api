@@ -566,8 +566,32 @@
                                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"
                               ></path>
                             </svg>
-                            <%= setup.error_message.substring(0, 50) %><%=
-                            setup.error_message.length > 50 ? '...' : '' %>
+                            <%
+                              // Smart error message truncation
+                              let errorSummary = setup.error_message;
+                              
+                              // Extract meaningful part of error message
+                              if (errorSummary.includes('This value already exists')) {
+                                errorSummary = 'Resource already exists';
+                              } else if (errorSummary.includes('Connection refused')) {
+                                errorSummary = 'Connection failed';
+                              } else if (errorSummary.includes('Authentication failed')) {
+                                errorSummary = 'Authentication error';
+                              } else if (errorSummary.includes('Command failed')) {
+                                errorSummary = 'Command execution failed';
+                              } else if (errorSummary.includes('timeout')) {
+                                errorSummary = 'Operation timeout';
+                              } else if (errorSummary.includes('ENOTFOUND')) {
+                                errorSummary = 'DNS resolution failed';
+                              } else {
+                                // Take first meaningful line, remove newlines
+                                errorSummary = errorSummary.split('\n')[0].trim();
+                                if (errorSummary.length > 50) {
+                                  errorSummary = errorSummary.substring(0, 47) + '...';
+                                }
+                              }
+                            %>
+                            <%= errorSummary %>
                           </div>
                           <% } %>
                         </div>
@@ -1563,22 +1587,122 @@
           modal.className =
             "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4";
 
-          // Escape and format error message
+          // Enhanced error message formatting for consistent display across environments
           const formattedError = errorMessage
-            ? errorMessage
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .split('\n')
-                .map(line => {
-                  // Check if this line is a field error (e.g., "domainName: This value already exists.")
-                  if (line.match(/^\w+:\s*This value already exists\.?$/)) {
-                    const [field, message] = line.split(':');
-                    return `<span class="text-red-600 font-semibold">${field.trim()}:</span> <span class="text-red-500">${message.trim()}</span>`;
-                  }
-                  return line;
-                })
-                .join('<br>')
+            ? formatErrorMessage(errorMessage)
             : "No error details available";
+
+          // Function to format error messages consistently
+          function formatErrorMessage(rawError) {
+            if (!rawError) return "No error details available";
+            
+            // Escape HTML characters first
+            let escaped = rawError
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;");
+            
+            // Split by newlines and process each line
+            return escaped
+              .split(/\r?\n/)
+              .map(line => {
+                line = line.trim();
+                if (!line) return '';
+                
+                // Handle different error formats
+                
+                // Format 1: Field validation errors (e.g., "domainName: This value already exists.")
+                if (line.match(/^\w+:\s*This value already exists\.?$/)) {
+                  const [field, message] = line.split(':', 2);
+                  return `<span class="text-red-600 font-semibold">${field.trim()}:</span> <span class="text-red-500">${message.trim()}</span>`;
+                }
+                
+                // Format 2: CloudPanel API errors (e.g., "Error: Domain already exists")
+                if (line.match(/^Error:\s*.+/i)) {
+                  return `<span class="text-red-600 font-semibold">Error:</span> <span class="text-red-500">${line.replace(/^Error:\s*/i, '')}</span>`;
+                }
+                
+                // Format 3: Command execution errors (e.g., "Command failed: ...")
+                if (line.match(/^Command failed:\s*.+/i)) {
+                  return `<span class="text-red-600 font-semibold">Command Failed:</span> <span class="text-red-500">${line.replace(/^Command failed:\s*/i, '')}</span>`;
+                }
+                
+                // Format 4: JSON error responses
+                try {
+                  const jsonError = JSON.parse(line);
+                  if (jsonError.error || jsonError.message) {
+                    return `<span class="text-red-600 font-semibold">API Error:</span> <span class="text-red-500">${jsonError.error || jsonError.message}</span>`;
+                  }
+                } catch (e) {
+                  // Not JSON, continue with other formats
+                }
+                
+                // Format 5: Stack trace lines (make them smaller and gray)
+                if (line.match(/^\s*at\s+.+/) || line.match(/^\s*\w+\.\w+\(.+\)/)) {
+                  return `<span class="text-xs text-gray-500">${line}</span>`;
+                }
+                
+                // Format 6: File paths (make them smaller)
+                if (line.match(/^\/[\w\/\-\.]+/)) {
+                  return `<span class="text-xs text-gray-600">${line}</span>`;
+                }
+                
+                // Default: regular error text
+                return `<span class="text-gray-800">${line}</span>`;
+              })
+              .filter(line => line.length > 0)
+              .join('<br>');
+                     }
+
+          // Function to get environment-specific troubleshooting tips
+          function getTroubleshootingTips(errorMessage) {
+            const tips = [];
+            
+            // Check error patterns and provide specific tips
+            if (errorMessage && errorMessage.includes('This value already exists')) {
+              tips.push('<li><strong>Resource Conflict:</strong> The domain name or site user already exists in CloudPanel</li>');
+              tips.push('<li>Try using a different domain name or site user name</li>');
+              tips.push('<li>Check if the domain was previously created and delete it before retrying</li>');
+            } else if (errorMessage && errorMessage.includes('Connection refused')) {
+              tips.push('<li><strong>Connection Issue:</strong> Unable to connect to CloudPanel API</li>');
+              tips.push('<li>Check if CloudPanel service is running</li>');
+              tips.push('<li>Verify network connectivity and firewall settings</li>');
+            } else if (errorMessage && errorMessage.includes('Authentication failed')) {
+              tips.push('<li><strong>Authentication Error:</strong> CloudPanel credentials are invalid</li>');
+              tips.push('<li>Check CloudPanel username and password in environment variables</li>');
+              tips.push('<li>Verify CloudPanel user has sufficient permissions</li>');
+            } else if (errorMessage && errorMessage.includes('Command failed')) {
+              tips.push('<li><strong>Command Execution Error:</strong> A system command failed to execute</li>');
+              tips.push('<li>Check server resources (disk space, memory)</li>');
+              tips.push('<li>Verify file permissions and ownership</li>');
+            } else if (errorMessage && (errorMessage.includes('ENOTFOUND') || errorMessage.includes('DNS'))) {
+              tips.push('<li><strong>DNS Resolution Error:</strong> Unable to resolve domain name</li>');
+              tips.push('<li>Check domain DNS configuration</li>');
+              tips.push('<li>Verify domain is pointing to correct server</li>');
+            } else if (errorMessage && errorMessage.includes('timeout')) {
+              tips.push('<li><strong>Timeout Error:</strong> Operation took too long to complete</li>');
+              tips.push('<li>Check server performance and load</li>');
+              tips.push('<li>Retry the operation or increase timeout settings</li>');
+            } else {
+              // Generic troubleshooting tips
+              tips.push('<li>Check if the domain name is valid and properly configured</li>');
+              tips.push('<li>Verify that the site user has proper permissions</li>');
+              tips.push('<li>Ensure database credentials are correct</li>');
+            }
+            
+            // Common tips for all scenarios
+            tips.push('<li>Check if the repository URL is accessible (if using Git)</li>');
+            tips.push('<li>Review server logs for additional error details</li>');
+            
+            // Environment-specific tips
+            const isProduction = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+            if (isProduction) {
+              tips.push('<li><strong>Production Environment:</strong> Contact system administrator if issue persists</li>');
+            } else {
+              tips.push('<li><strong>Development Environment:</strong> Check VPS connection and credentials</li>');
+            }
+            
+            return tips.join('');
+          }
 
           modal.innerHTML = `
                     <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
@@ -1617,11 +1741,7 @@
                                     <div class="text-sm text-blue-800">
                                         <p class="font-medium mb-1">Troubleshooting Tips:</p>
                                         <ul class="list-disc list-inside space-y-1 text-blue-700">
-                                            ${errorMessage && errorMessage.includes('This value already exists') 
-                                              ? '<li><strong>Resource Conflict:</strong> The domain name or site user already exists in CloudPanel</li><li>Try using a different domain name or site user name</li><li>Check if the domain was previously created and delete it before retrying</li>' 
-                                              : '<li>Check if the domain name is valid and properly configured</li><li>Verify that the site user has proper permissions</li><li>Ensure database credentials are correct</li>'}
-                                            <li>Check if the repository URL is accessible (if using Git)</li>
-                                            <li>Review server logs for additional error details</li>
+                                            ${getTroubleshootingTips(errorMessage)}
                                         </ul>
                                     </div>
                                 </div>
