@@ -122,17 +122,143 @@ class JobQueue {
       setupTracking.errorMessage = errorMessage;
       
       try {
-        const savedSetup = await databaseService.createSetup(setupTracking);
-        logger.info(`Setup data saved to database with ID: ${savedSetup.id}`, {
-          jobId: job.id,
-          status: status,
-          errorMessage: errorMessage
-        });
+        let savedSetup;
+        
+        // If this is a retry (setupId provided), update existing record
+        if (data.isRetry && data.setupId) {
+          // Check current setup status before updating
+          const currentSetup = await databaseService.getSetupById(data.setupId);
+          
+          if (!currentSetup) {
+            logger.error(`Setup with ID ${data.setupId} not found`, {
+              jobId: job.id
+            });
+            return null;
+          }
+
+          // Only allow updates for failed or in_progress setups
+          // Don't update completed setups unless the new status is also completed
+          if (currentSetup.setup_status === 'completed' && status !== 'completed') {
+            logger.warn(`Skipping update for completed setup ID: ${data.setupId}. Cannot downgrade from completed to ${status}`, {
+              jobId: job.id,
+              currentStatus: currentSetup.setup_status,
+              newStatus: status
+            });
+            return { id: data.setupId, isUpdate: false, skipped: true };
+          }
+
+          const updateData = {
+            job_id: job.id,
+            setup_status: status,
+            error_message: errorMessage,
+            site_created: setupTracking.siteCreated ? 1 : 0,
+            database_created: setupTracking.databaseCreated ? 1 : 0,
+            ssh_keys_copied: setupTracking.sshKeysCopied ? 1 : 0,
+            repository_cloned: setupTracking.repositoryCloned ? 1 : 0,
+            env_configured: setupTracking.envConfigured ? 1 : 0,
+            laravel_setup_completed: setupTracking.laravelSetupCompleted ? 1 : 0
+          };
+          
+          await databaseService.updateSetup(data.setupId, updateData);
+          savedSetup = { id: data.setupId, isUpdate: true };
+          
+          logger.info(`Setup data updated in database with ID: ${data.setupId}`, {
+            jobId: job.id,
+            status: status,
+            errorMessage: errorMessage,
+            isRetry: true,
+            previousStatus: currentSetup.setup_status
+          });
+        } else {
+          // Check if setup already exists for this domain
+          const existingSetup = await databaseService.getSetupByDomain(data.domainName);
+          
+          if (existingSetup) {
+            // Rule 1: If existing setup is completed, create new failed entry (don't update completed)
+            if (existingSetup.setup_status === 'completed' && status !== 'completed') {
+              logger.info(`Creating new failed setup entry for domain ${data.domainName} because existing setup is completed`, {
+                jobId: job.id,
+                existingSetupId: existingSetup.id,
+                existingStatus: existingSetup.setup_status,
+                newStatus: status
+              });
+              
+              // Create new setup record for failed attempt
+              savedSetup = await databaseService.createSetup(setupTracking);
+              logger.info(`New failed setup created with ID: ${savedSetup.id} for domain: ${data.domainName}`, {
+                jobId: job.id,
+                status: status,
+                errorMessage: errorMessage,
+                reason: 'existing_completed'
+              });
+            } 
+            // Rule 2: If existing setup is failed/in_progress, update it
+            else if (existingSetup.setup_status === 'failed' || existingSetup.setup_status === 'in_progress') {
+              const updateData = {
+                job_id: job.id,
+                setup_status: status,
+                error_message: errorMessage,
+                site_created: setupTracking.siteCreated ? 1 : 0,
+                database_created: setupTracking.databaseCreated ? 1 : 0,
+                ssh_keys_copied: setupTracking.sshKeysCopied ? 1 : 0,
+                repository_cloned: setupTracking.repositoryCloned ? 1 : 0,
+                env_configured: setupTracking.envConfigured ? 1 : 0,
+                laravel_setup_completed: setupTracking.laravelSetupCompleted ? 1 : 0
+              };
+              
+              await databaseService.updateSetup(existingSetup.id, updateData);
+              savedSetup = { id: existingSetup.id, isUpdate: true };
+              
+              logger.info(`Updated existing failed/in_progress setup with ID: ${existingSetup.id} for domain: ${data.domainName}`, {
+                jobId: job.id,
+                status: status,
+                errorMessage: errorMessage,
+                previousStatus: existingSetup.setup_status,
+                reason: 'update_failed'
+              });
+            }
+            // Rule 3: If trying to update completed with completed, allow update
+            else if (existingSetup.setup_status === 'completed' && status === 'completed') {
+              const updateData = {
+                job_id: job.id,
+                setup_status: status,
+                error_message: errorMessage,
+                site_created: setupTracking.siteCreated ? 1 : 0,
+                database_created: setupTracking.databaseCreated ? 1 : 0,
+                ssh_keys_copied: setupTracking.sshKeysCopied ? 1 : 0,
+                repository_cloned: setupTracking.repositoryCloned ? 1 : 0,
+                env_configured: setupTracking.envConfigured ? 1 : 0,
+                laravel_setup_completed: setupTracking.laravelSetupCompleted ? 1 : 0
+              };
+              
+              await databaseService.updateSetup(existingSetup.id, updateData);
+              savedSetup = { id: existingSetup.id, isUpdate: true };
+              
+              logger.info(`Updated completed setup with ID: ${existingSetup.id} for domain: ${data.domainName}`, {
+                jobId: job.id,
+                status: status,
+                errorMessage: errorMessage,
+                previousStatus: existingSetup.setup_status,
+                reason: 'update_completed'
+              });
+            }
+          } else {
+            // Create new setup record only if none exists
+            savedSetup = await databaseService.createSetup(setupTracking);
+            logger.info(`Setup data saved to database with ID: ${savedSetup.id}`, {
+              jobId: job.id,
+              status: status,
+              errorMessage: errorMessage,
+              isRetry: false
+            });
+          }
+        }
+        
         return savedSetup;
       } catch (dbError) {
         logger.error(
           `Failed to save setup data to database: ${dbError.message}`,
-          { jobId: job.id, status: status }
+          { jobId: job.id, status: status, isRetry: data.isRetry || false }
         );
         return null;
       }
@@ -384,6 +510,367 @@ class JobQueue {
   }
 
   /**
+   * Process a specific step of Laravel setup job
+   */
+  async processSetupStepJob(job) {
+    const data = JSON.parse(job.data);
+    const startTime = Date.now();
+
+    logger.info(`Starting Laravel setup step '${data.retryStep}' job for domain: ${data.domainName}`, {
+      jobId: job.id,
+      step: data.retryStep,
+      domainName: data.domainName,
+      isRetry: data.isRetry
+    });
+
+    // Initialize tracking with current states
+    const setupTracking = {
+      jobId: job.id,
+      domainName: data.domainName,
+      phpVersion: data.phpVersion,
+      vhostTemplate: data.vhostTemplate,
+      siteUser: data.siteUser,
+      siteUserPassword: data.siteUserPassword,
+      databaseName: data.databaseName,
+      databaseUserName: data.databaseUserName,
+      databaseUserPassword: data.databaseUserPassword,
+      repositoryUrl: data.repositoryUrl,
+      runMigrations: data.runMigrations,
+      runSeeders: data.runSeeders,
+      optimizeCache: data.optimizeCache,
+      installComposer: data.installComposer,
+      setupStatus: "in_progress",
+      errorMessage: null,
+      // Start with current states from database
+      siteCreated: data.currentStepStates.site_created || false,
+      databaseCreated: data.currentStepStates.database_created || false,
+      sshKeysCopied: data.currentStepStates.ssh_keys_copied || false,
+      repositoryCloned: data.currentStepStates.repository_cloned || false,
+      envConfigured: data.currentStepStates.env_configured || false,
+      laravelSetupCompleted: data.currentStepStates.laravel_setup_completed || false,
+    };
+
+    const cloudpanelService = require("./cloudpanel");
+    const databaseService = require("./database");
+
+         // Function to save setup data regardless of success or failure
+     const saveSetupData = async (status, errorMessage = null) => {
+       setupTracking.setupStatus = status;
+       setupTracking.errorMessage = errorMessage;
+       
+       try {
+         // Check current setup status before updating
+         const currentSetup = await databaseService.getSetupById(data.setupId);
+         
+         if (!currentSetup) {
+           logger.error(`Setup with ID ${data.setupId} not found`, {
+             jobId: job.id,
+             step: data.retryStep
+           });
+           return null;
+         }
+
+         // For step retry, we can update completed setups but only to improve individual steps
+         // Rule: Allow step retry on completed setups to fix individual failed steps
+         // The overall status logic will be handled after step execution
+         
+         // Update existing record since this is always a step retry
+         const updateData = {
+           job_id: job.id,
+           setup_status: status,
+           error_message: errorMessage,
+           site_created: setupTracking.siteCreated ? 1 : 0,
+           database_created: setupTracking.databaseCreated ? 1 : 0,
+           ssh_keys_copied: setupTracking.sshKeysCopied ? 1 : 0,
+           repository_cloned: setupTracking.repositoryCloned ? 1 : 0,
+           env_configured: setupTracking.envConfigured ? 1 : 0,
+           laravel_setup_completed: setupTracking.laravelSetupCompleted ? 1 : 0
+         };
+         
+         await databaseService.updateSetup(data.setupId, updateData);
+         
+         logger.info(`Setup step '${data.retryStep}' data updated in database with ID: ${data.setupId}`, {
+           jobId: job.id,
+           step: data.retryStep,
+           status: status,
+           errorMessage: errorMessage,
+           isStepRetry: true,
+           previousStatus: currentSetup.setup_status
+         });
+         
+         return { id: data.setupId, isUpdate: true };
+       } catch (dbError) {
+         logger.error(
+           `Failed to save setup step data to database: ${dbError.message}`,
+           { jobId: job.id, step: data.retryStep, status: status }
+         );
+         return null;
+       }
+     };
+
+    try {
+      const step = data.retryStep;
+      
+      logger.site(
+        "info",
+        `Executing individual step: ${step} for ${data.domainName}`,
+        {
+          jobId: job.id,
+          domainName: data.domainName,
+          step: step,
+          currentStates: data.currentStepStates
+        }
+      );
+
+      // Execute specific step based on retryStep
+      switch (step) {
+        case 'site_created':
+          logger.info(`Retrying Step 1: Creating PHP site with Laravel for ${data.domainName}`, {
+            jobId: job.id,
+            step: step
+          });
+
+          const siteResult = await cloudpanelService.createSiteSetup(
+            data.domainName,
+            data.phpVersion,
+            data.vhostTemplate,
+            data.siteUser,
+            data.siteUserPassword
+          );
+
+          if (!siteResult.success) {
+            throw new Error(`Site creation failed: ${siteResult.error || "Unknown error"}`);
+          }
+
+          setupTracking.siteCreated = true;
+          logger.success("site", `Laravel PHP site created successfully for ${data.domainName}`, {
+            jobId: job.id,
+            step: step
+          });
+          break;
+
+        case 'database_created':
+          logger.info(`Retrying Step 2: Creating database for ${data.domainName}`, {
+            jobId: job.id,
+            step: step
+          });
+
+          const dbResult = await cloudpanelService.createDatabaseSetup(
+            data.domainName,
+            data.databaseName,
+            data.databaseUserName,
+            data.databaseUserPassword
+          );
+
+          if (!dbResult.success) {
+            throw new Error(`Database creation failed: ${dbResult.error || "Unknown error"}`);
+          }
+
+          setupTracking.databaseCreated = true;
+          logger.success("site", `Database created successfully for ${data.domainName}`, {
+            jobId: job.id,
+            step: step,
+            databaseName: data.databaseName
+          });
+          break;
+
+        case 'ssh_keys_copied':
+          logger.info(`Retrying Step 3: Copying SSH keys to site user: ${data.siteUser}`, {
+            jobId: job.id,
+            step: step
+          });
+
+          const sshResult = await cloudpanelService.copySshKeysToUser(data.siteUser);
+
+          if (!sshResult.success) {
+            throw new Error(`SSH key copy failed: ${sshResult.error || "Unknown error"}`);
+          }
+
+          setupTracking.sshKeysCopied = true;
+          logger.success("site", `SSH keys copied successfully for ${data.siteUser}`, {
+            jobId: job.id,
+            step: step
+          });
+          break;
+
+        case 'repository_cloned':
+          if (!data.repositoryUrl) {
+            throw new Error("Repository URL is required for repository cloning step");
+          }
+
+          logger.info(`Retrying Step 4: Cloning repository for ${data.domainName}`, {
+            jobId: job.id,
+            step: step,
+            repositoryUrl: data.repositoryUrl
+          });
+
+          const cloneResult = await cloudpanelService.cloneRepository(
+            data.domainName,
+            data.repositoryUrl,
+            data.siteUser
+          );
+
+          if (!cloneResult.success) {
+            throw new Error(`Repository clone failed: ${cloneResult.error || "Unknown error"}`);
+          }
+
+          setupTracking.repositoryCloned = true;
+          logger.success("site", `Repository cloned successfully for ${data.domainName}`, {
+            jobId: job.id,
+            step: step
+          });
+          break;
+
+        case 'env_configured':
+          logger.info(`Retrying Step 5: Configuring Laravel .env for ${data.domainName}`, {
+            jobId: job.id,
+            step: step
+          });
+
+          const envSettings = {
+            dbHost: "localhost",
+            dbDatabase: data.databaseName,
+            dbUsername: data.databaseUserName,
+            dbPassword: data.databaseUserPassword,
+            appUrl: `https://${data.domainName}`,
+            appEnv: "production",
+            appDebug: "false",
+          };
+
+          const envResult = await cloudpanelService.configureLaravelEnv(
+            data.domainName,
+            data.siteUser,
+            envSettings
+          );
+
+          if (!envResult.success) {
+            throw new Error(`Laravel .env configuration failed: ${envResult.error || "Unknown error"}`);
+          }
+
+          setupTracking.envConfigured = true;
+          logger.success("site", `Laravel .env configured successfully for ${data.domainName}`, {
+            jobId: job.id,
+            step: step
+          });
+          break;
+
+        case 'laravel_setup_completed':
+          logger.info(`Retrying Step 6: Running Laravel setup commands for ${data.domainName}`, {
+            jobId: job.id,
+            step: step
+          });
+
+          const setupOptions = {
+            runMigrations: data.runMigrations === true,
+            runSeeders: data.runSeeders === true,
+            optimizeCache: data.optimizeCache === true,
+            installComposer: data.installComposer === true,
+          };
+
+          const laravelSetupResult = await cloudpanelService.runLaravelSetup(
+            data.domainName,
+            data.siteUser,
+            setupOptions
+          );
+
+          if (!laravelSetupResult.success) {
+            throw new Error(`Laravel setup commands failed: ${laravelSetupResult.error || "Unknown error"}`);
+          }
+
+          setupTracking.laravelSetupCompleted = true;
+          logger.success("site", `Laravel setup commands completed successfully for ${data.domainName}`, {
+            jobId: job.id,
+            step: step
+          });
+          break;
+
+        default:
+          throw new Error(`Unknown setup step: ${step}`);
+      }
+
+             // Check if all steps are now completed
+       const allStepsCompleted = setupTracking.siteCreated && 
+                                setupTracking.databaseCreated && 
+                                setupTracking.sshKeysCopied && 
+                                setupTracking.repositoryCloned && 
+                                setupTracking.envConfigured && 
+                                setupTracking.laravelSetupCompleted;
+
+       // Determine final status based on step completion and current status
+       let finalStatus;
+       const currentSetup = await databaseService.getSetupById(data.setupId);
+       
+       if (allStepsCompleted) {
+         finalStatus = "completed";
+       } else {
+         // For step retry: 
+         // - If original setup was completed, keep it completed (individual step may still fail)
+         // - If original setup was failed/in_progress, mark as failed
+         if (currentSetup && currentSetup.setup_status === 'completed') {
+           finalStatus = 'completed'; // Don't downgrade completed status
+           logger.info(`Keeping completed status for setup ${data.setupId} despite individual step retry result`, {
+             jobId: job.id,
+             step: data.retryStep,
+             allStepsCompleted
+           });
+         } else {
+           finalStatus = 'failed';
+         }
+       }
+       
+       const savedSetup = await saveSetupData(finalStatus);
+
+      const result = {
+        setupId: savedSetup ? savedSetup.id : null,
+        domainName: data.domainName,
+        step: step,
+        status: "completed",
+        overallStatus: finalStatus,
+        allStepsCompleted: allStepsCompleted,
+        executionTime: Date.now() - startTime,
+        stepResult: `Step '${step}' completed successfully`,
+        steps: {
+          siteCreated: setupTracking.siteCreated,
+          databaseCreated: setupTracking.databaseCreated,
+          sshKeysCopied: setupTracking.sshKeysCopied,
+          repositoryCloned: setupTracking.repositoryCloned,
+          envConfigured: setupTracking.envConfigured,
+          laravelSetupCompleted: setupTracking.laravelSetupCompleted,
+        },
+      };
+
+      await this.updateJobStatus(job.id, "completed", result);
+      return result;
+    } catch (error) {
+      logger.error(`Setup step job ${job.id} failed for step '${data.retryStep}':`, error);
+
+      // Save failed setup data to database with error message
+      const savedSetup = await saveSetupData("failed", error.message || "Unknown error occurred during step execution");
+
+      // Create result object for failed step job
+      const result = {
+        setupId: savedSetup ? savedSetup.id : null,
+        domainName: data.domainName,
+        step: data.retryStep,
+        status: "failed",
+        executionTime: Date.now() - startTime,
+        errorMessage: error.message || "Unknown error occurred during step execution",
+        steps: {
+          siteCreated: setupTracking.siteCreated,
+          databaseCreated: setupTracking.databaseCreated,
+          sshKeysCopied: setupTracking.sshKeysCopied,
+          repositoryCloned: setupTracking.repositoryCloned,
+          envConfigured: setupTracking.envConfigured,
+          laravelSetupCompleted: setupTracking.laravelSetupCompleted,
+        },
+      };
+
+      await this.updateJobStatus(job.id, "failed", result, error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Process a single job
    */
   async processJob(job) {
@@ -394,6 +881,9 @@ class JobQueue {
       switch (job.type) {
         case "setup_laravel":
           result = await this.processSetupJob(job);
+          break;
+        case "setup_laravel_step":
+          result = await this.processSetupStepJob(job);
           break;
         default:
           throw new Error(`Unknown job type: ${job.type}`);

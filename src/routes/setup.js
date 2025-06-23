@@ -41,6 +41,34 @@ router.post(
     logger.site('info', `Queueing Laravel setup for domain: ${domainName}`, setupDetails);
 
     try {
+      // Check if setup already exists for this domain
+      const existingSetup = await databaseService.getSetupByDomain(domainName);
+      
+      if (existingSetup) {
+        // Check if existing setup is still in progress
+        if (existingSetup.setup_status === 'in_progress') {
+          return BaseController.sendError(
+            res,
+            "Setup already in progress",
+            `A setup for domain "${domainName}" is already in progress. Please wait for it to complete or retry the existing setup.`,
+            400
+          );
+        }
+        
+        // If existing setup is failed or completed, we can allow new setup
+        if (existingSetup.setup_status === 'completed') {
+          logger.info(`Existing completed setup found for domain ${domainName}. New failed setup will create separate entry.`, {
+            existingSetupId: existingSetup.id,
+            existingStatus: existingSetup.setup_status
+          });
+        } else {
+          logger.warn(`Existing setup found for domain ${domainName} with status: ${existingSetup.setup_status}. New setup will update the existing record.`, {
+            existingSetupId: existingSetup.id,
+            existingStatus: existingSetup.setup_status
+          });
+        }
+      }
+
       // Prepare job data
       const jobData = {
         domainName,
@@ -368,6 +396,327 @@ router.get("/queue/status", BaseController.asyncHandler(async (req, res) => {
   } catch (error) {
     logger.error("Failed to retrieve queue status:", error);
     BaseController.sendError(res, "Failed to retrieve queue status", error.message, 500);
+  }
+}));
+
+/**
+ * @route POST /api/setup/retry/:setupId
+ * @desc Retry a failed Laravel site setup
+ * @access Public
+ */
+router.post(
+  "/retry/:setupId",
+  BaseController.asyncHandler(async (req, res) => {
+    const { setupId } = req.params;
+
+    try {
+      // Get the existing setup record
+      const existingSetup = await databaseService.getSetupById(setupId);
+      
+      if (!existingSetup) {
+        return BaseController.sendError(
+          res,
+          "Setup not found",
+          `No setup found with ID: ${setupId}`,
+          404
+        );
+      }
+
+      // Check if setup is in a state that can be retried
+      if (existingSetup.setup_status === 'completed') {
+        return BaseController.sendError(
+          res,
+          "Cannot retry completed setup",
+          "This setup has already been completed successfully",
+          400
+        );
+      }
+
+      if (existingSetup.setup_status === 'in_progress') {
+        return BaseController.sendError(
+          res,
+          "Setup already in progress",
+          "This setup is currently running and cannot be retried",
+          400
+        );
+      }
+
+      const {
+        domain_name: domainName,
+        php_version: phpVersion,
+        vhost_template: vhostTemplate,
+        site_user: siteUser,
+        site_user_password: siteUserPassword,
+        database_name: databaseName,
+        database_user_name: databaseUserName,
+        database_user_password: databaseUserPassword,
+        repository_url: repositoryUrl,
+        run_migrations: runMigrations,
+        run_seeders: runSeeders,
+        optimize_cache: optimizeCache,
+        install_composer: installComposer
+      } = existingSetup;
+
+      logger.site('info', `Retrying Laravel setup for domain: ${domainName}`, {
+        setupId,
+        domainName,
+        phpVersion,
+        vhostTemplate,
+        siteUser,
+        databaseName,
+        databaseUserName
+      });
+
+      // Prepare job data
+      const jobData = {
+        setupId, // Include setupId to update existing record
+        domainName,
+        phpVersion: phpVersion || '8.3',
+        vhostTemplate: vhostTemplate || 'Laravel 12',
+        siteUser,
+        siteUserPassword,
+        databaseName,
+        databaseUserName,
+        databaseUserPassword,
+        repositoryUrl: repositoryUrl || null,
+        runMigrations: runMigrations !== null ? runMigrations : true,
+        runSeeders: runSeeders !== null ? runSeeders : true,
+        optimizeCache: optimizeCache !== null ? optimizeCache : true,
+        installComposer: installComposer !== null ? installComposer : true,
+        isRetry: true // Flag to indicate this is a retry
+      };
+
+      // Update setup status to in_progress and clear error
+      await databaseService.updateSetupStatus(setupId, 'in_progress', null, null);
+
+      // Add job to queue with high priority
+      const job = await jobQueue.addJob('setup_laravel', jobData, 1);
+
+      logger.success('site', `Laravel setup retry job queued successfully for ${domainName}`, {
+        setupId,
+        jobId: job.id,
+        domainName,
+        status: 'queued'
+      });
+
+      BaseController.sendSuccess(
+        res,
+        "Laravel setup retry has been queued successfully",
+        {
+          setupId,
+          jobId: job.id,
+          domainName,
+          status: 'in_progress',
+          message: 'Your Laravel site setup retry is now in progress. The existing record will be updated.',
+          statusEndpoint: `/api/setup/job/${job.id}`,
+          estimatedTime: '5-10 minutes'
+        }
+      );
+    } catch (error) {
+      logger.error("Failed to retry Laravel setup:", error);
+
+      const errorMessage = error.message || "Unknown error occurred while retrying setup";
+      const errorDetails = error.error || error.stderr || null;
+
+      BaseController.sendError(
+        res,
+        "Failed to retry Laravel setup",
+        errorDetails || errorMessage,
+        500
+      );
+    }
+  })
+);
+
+/**
+ * @route POST /api/setup/retry-step/:setupId
+ * @desc Retry a specific step of a failed Laravel site setup
+ * @access Public
+ */
+router.post(
+  "/retry-step/:setupId",
+  BaseController.asyncHandler(async (req, res) => {
+    const { setupId } = req.params;
+    const { step } = req.body; // The specific step to retry
+
+    try {
+      // Get the existing setup record
+      const existingSetup = await databaseService.getSetupById(setupId);
+      
+      if (!existingSetup) {
+        return BaseController.sendError(
+          res,
+          "Setup not found",
+          `No setup found with ID: ${setupId}`,
+          404
+        );
+      }
+
+      // Check if setup is in a state that can be retried
+      if (existingSetup.setup_status === 'completed') {
+        // For completed setups, only allow retry if the specific step is not completed
+        // Check if the requested step is actually failed/incomplete
+        const stepValue = existingSetup[step];
+        
+        if (stepValue === 1 || stepValue === true) {
+          return BaseController.sendError(
+            res,
+            "Cannot retry completed step",
+            `The step '${step}' has already been completed successfully`,
+            400
+          );
+        }
+        
+        // Allow retry of incomplete steps even in completed setups
+        logger.info(`Allowing retry of incomplete step '${step}' in completed setup`, {
+          setupId,
+          domainName: existingSetup.domain_name,
+          step,
+          stepValue,
+          setupStatus: existingSetup.setup_status
+        });
+      }
+
+      if (existingSetup.setup_status === 'in_progress') {
+        return BaseController.sendError(
+          res,
+          "Setup already in progress",
+          "This setup is currently running and cannot be retried",
+          400
+        );
+      }
+
+      // Validate step
+      const validSteps = [
+        'site_created',
+        'database_created', 
+        'ssh_keys_copied',
+        'repository_cloned',
+        'env_configured',
+        'laravel_setup_completed'
+      ];
+
+      if (!validSteps.includes(step)) {
+        return BaseController.sendError(
+          res,
+          "Invalid step",
+          `Step must be one of: ${validSteps.join(', ')}`,
+          400
+        );
+      }
+
+      const {
+        domain_name: domainName,
+        php_version: phpVersion,
+        vhost_template: vhostTemplate,
+        site_user: siteUser,
+        site_user_password: siteUserPassword,
+        database_name: databaseName,
+        database_user_name: databaseUserName,
+        database_user_password: databaseUserPassword,
+        repository_url: repositoryUrl,
+        run_migrations: runMigrations,
+        run_seeders: runSeeders,
+        optimize_cache: optimizeCache,
+        install_composer: installComposer
+      } = existingSetup;
+
+      logger.site('info', `Retrying step '${step}' for domain: ${domainName}`, {
+        setupId,
+        domainName,
+        step,
+        siteUser,
+        databaseName,
+        databaseUserName
+      });
+
+      // Prepare job data for specific step retry
+      const jobData = {
+        setupId, // Include setupId to update existing record
+        domainName,
+        phpVersion: phpVersion || '8.3',
+        vhostTemplate: vhostTemplate || 'Laravel 12',
+        siteUser,
+        siteUserPassword,
+        databaseName,
+        databaseUserName,
+        databaseUserPassword,
+        repositoryUrl: repositoryUrl || null,
+        runMigrations: runMigrations !== null ? runMigrations : true,
+        runSeeders: runSeeders !== null ? runSeeders : true,
+        optimizeCache: optimizeCache !== null ? optimizeCache : true,
+        installComposer: installComposer !== null ? installComposer : true,
+        isRetry: true,
+        retryStep: step, // Specific step to retry
+        currentStepStates: {
+          site_created: existingSetup.site_created,
+          database_created: existingSetup.database_created,
+          ssh_keys_copied: existingSetup.ssh_keys_copied,
+          repository_cloned: existingSetup.repository_cloned,
+          env_configured: existingSetup.env_configured,
+          laravel_setup_completed: existingSetup.laravel_setup_completed
+        }
+      };
+
+      // Update setup status to in_progress and clear error
+      await databaseService.updateSetupStatus(setupId, 'in_progress', null, null);
+
+      // Add job to queue with high priority
+      const job = await jobQueue.addJob('setup_laravel_step', jobData, 1);
+
+      logger.success('site', `Laravel setup step '${step}' retry job queued successfully for ${domainName}`, {
+        setupId,
+        jobId: job.id,
+        domainName,
+        step,
+        status: 'queued'
+      });
+
+      BaseController.sendSuccess(
+        res,
+        `Laravel setup step '${step}' retry has been queued successfully`,
+        {
+          setupId,
+          jobId: job.id,
+          domainName,
+          step,
+          status: 'in_progress',
+          message: `Your Laravel site setup step '${step}' retry is now in progress. Only this specific step will be executed.`,
+          statusEndpoint: `/api/setup/job/${job.id}`,
+          estimatedTime: '1-3 minutes'
+        }
+      );
+    } catch (error) {
+      logger.error(`Failed to retry Laravel setup step '${step}':`, error);
+
+      const errorMessage = error.message || "Unknown error occurred while retrying setup step";
+      const errorDetails = error.error || error.stderr || null;
+
+      BaseController.sendError(
+        res,
+        `Failed to retry Laravel setup step '${step}'`,
+        errorDetails || errorMessage,
+        500
+      );
+    }
+  })
+);
+
+/**
+ * @route POST /api/setup/cleanup-duplicates
+ * @desc Clean up duplicate setups for the same domain (keep only latest)
+ * @access Public
+ */
+router.post("/cleanup-duplicates", BaseController.asyncHandler(async (req, res) => {
+  try {
+    logger.info('Starting cleanup of duplicate setups...');
+    const result = await databaseService.cleanupDuplicateSetups();
+    
+    logger.info('Duplicate cleanup completed', result);
+    BaseController.sendSuccess(res, "Duplicate cleanup completed successfully", result);
+  } catch (error) {
+    logger.error("Failed to cleanup duplicate setups:", error);
+    BaseController.sendError(res, "Failed to cleanup duplicate setups", error.message, 500);
   }
 }));
 
