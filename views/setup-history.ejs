@@ -2147,16 +2147,26 @@
 
       // Function to delete all failed setups
       async function deleteAllErrors() {
-        // Get all failed setup rows
-        const failedRows = document.querySelectorAll('tr[data-setup-id] .bg-red-100');
+        // Get all failed setup rows - specifically target status column with bg-red-100 (failed status)
+        const failedStatusElements = document.querySelectorAll('tr[data-setup-id] .bg-red-100');
+        
+        // Filter to only get status elements (not button hover states or other red elements)
+        const failedRows = Array.from(failedStatusElements).filter(element => {
+          // Check if this is actually a status span (contains "Failed" text or error-status class)
+          return element.textContent.includes('Failed') || element.classList.contains('error-status');
+        });
         
         if (failedRows.length === 0) {
           showNotification("No failed setups found to delete.", "info");
           return;
         }
 
-        // Show confirmation dialog
-        const confirmed = await showDeleteAllErrorsConfirmation(failedRows.length);
+        // Check total setups to show safety info
+        const totalSetups = document.querySelectorAll('tr[data-setup-id]').length;
+        const completedSetups = document.querySelectorAll('tr[data-setup-id] .bg-green-100').length;
+        
+        // Show confirmation dialog with safety information
+        const confirmed = await showDeleteAllErrorsConfirmation(failedSetups.length, totalSetups, completedSetups);
         if (!confirmed) {
           return;
         }
@@ -2172,23 +2182,24 @@
           const total = failedRows.length;
 
           // Get setup IDs and domain names from failed rows
-          const failedSetups = Array.from(failedRows).map(statusElement => {
+          const failedSetups = failedRows.map(statusElement => {
             const row = statusElement.closest('tr[data-setup-id]');
-            return {
-              setupId: row.getAttribute('data-setup-id'),
-              domainName: row.getAttribute('data-setup-id'), // We'll get domain from the row
-              setupStatus: 'failed'
-            };
-          });
-
-          // Extract actual domain names from the rows
-          failedSetups.forEach(setup => {
-            const row = document.querySelector(`tr[data-setup-id="${setup.setupId}"]`);
+            const setupId = row.getAttribute('data-setup-id');
             const domainCell = row.querySelector('td:first-child .text-sm.font-medium');
-            if (domainCell) {
-              setup.domainName = domainCell.textContent.trim();
-            }
-          });
+            const domainName = domainCell ? domainCell.textContent.trim() : `Setup-${setupId}`;
+            
+            // Double check this is actually a failed setup by checking the status element
+            const actualStatus = statusElement.textContent.includes('Failed') ? 'failed' : 'unknown';
+            
+            return {
+              setupId: setupId,
+              domainName: domainName,
+              setupStatus: actualStatus
+            };
+          }).filter(setup => setup.setupStatus === 'failed'); // Only keep confirmed failed setups
+          
+          // Log what we found for debugging
+          console.log(`Found ${failedSetups.length} failed setups to delete:`, failedSetups.map(s => s.domainName));
 
           // Delete each failed setup
           for (let i = 0; i < failedSetups.length; i++) {
@@ -2251,7 +2262,7 @@
       }
 
       // Function to show confirmation dialog for delete all errors
-      function showDeleteAllErrorsConfirmation(count) {
+      function showDeleteAllErrorsConfirmation(failedCount, totalCount, completedCount) {
         return new Promise((resolve) => {
           const modal = document.createElement("div");
           modal.className = "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50";
@@ -2266,8 +2277,11 @@
                     </svg>
                   </div>
                   <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Delete All Failed Setups</h3>
-                    <p class="text-sm text-gray-600">${count} failed setup${count !== 1 ? 's' : ''} found</p>
+                    <h3 class="text-lg font-semibold text-gray-900">Delete Failed Setups Only</h3>
+                    <p class="text-sm text-gray-600">
+                      <span class="text-red-600 font-semibold">${failedCount} failed</span> of ${totalCount} total setups
+                      <br><span class="text-green-600 font-semibold">${completedCount} completed setups will be preserved</span>
+                    </p>
                   </div>
                 </div>
                 
@@ -2278,12 +2292,12 @@
                     </svg>
                     <div class="text-sm">
                       <p class="font-medium text-orange-800">Bulk Deletion Warning</p>
-                      <p class="text-orange-700 mt-1">This action will permanently delete all failed setup records from the database. CloudPanel sites will NOT be affected since these setups failed.</p>
+                      <p class="text-orange-700 mt-1">This action will permanently delete <strong>ONLY FAILED</strong> setup records from the database. <strong>Completed setups will be preserved.</strong> CloudPanel sites will NOT be affected since these setups failed.</p>
                     </div>
                   </div>
                 </div>
                 
-                <p class="text-gray-600 mb-6">Are you sure you want to delete <strong>${count} failed setup record${count !== 1 ? 's' : ''}</strong>? This action cannot be undone.</p>
+                <p class="text-gray-600 mb-6">Are you sure you want to delete <strong>${failedCount} failed setup record${failedCount !== 1 ? 's' : ''}</strong>? <strong class="text-green-600">${completedCount} completed setup${completedCount !== 1 ? 's' : ''} will remain untouched.</strong> This action cannot be undone.</p>
                 
                 <div class="flex justify-end space-x-3">
                   <button type="button" class="cancel-bulk-delete-btn px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
