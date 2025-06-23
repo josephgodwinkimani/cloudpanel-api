@@ -1525,7 +1525,12 @@
       }
 
       // Function to open phpMyAdmin for a specific database
-      function openPhpMyAdmin(domainName, siteUser, databaseUser, databasePassword) {
+      function openPhpMyAdmin(
+        domainName,
+        siteUser,
+        databaseUser,
+        databasePassword
+      ) {
         try {
           const protocol = "https:"; // Use https by default
           const hostname =
@@ -1543,7 +1548,7 @@
           const encodedPassword = encodeURIComponent(databasePassword);
 
           // Try CloudPanel's standard phpMyAdmin URL first
-          const phpMyAdminUrl = `${protocol}//${encodedUser}:${encodedPassword}@${hostname}:${port}/phpmyadmin/index.php`;
+          const phpMyAdminUrl = `${protocol}//${hostname}:${port}/pma/${domainName}/${siteUser}`;
           console.log(phpMyAdminUrl);
           // Show notification to user
           showNotification(`Opening phpMyAdmin for ${domainName}...`, "info");
