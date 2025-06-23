@@ -1341,7 +1341,29 @@ router.get("/", async (req, res) => {
 
     // Merge setup data with sites data
     const sitesWithSetupInfo = sites.map(site => {
-      const setupInfo = setupData.find(setup => setup.domain_name === site.domain);
+      // Find all setups for this domain
+      const domainSetups = setupData.filter(setup => setup.domain_name === site.domain);
+      
+      let setupInfo = null;
+      if (domainSetups.length > 0) {
+        // Priority: completed > in_progress > failed
+        // This ensures completed status is always shown when multiple entries exist
+        setupInfo = domainSetups.find(setup => setup.setup_status === 'completed') ||
+                   domainSetups.find(setup => setup.setup_status === 'in_progress') ||
+                   domainSetups.find(setup => setup.setup_status === 'failed');
+        
+        // Log when multiple entries exist for debugging
+        if (domainSetups.length > 1) {
+          const statuses = domainSetups.map(s => s.setup_status).join(', ');
+          logger.info(`Multiple setup entries found for domain ${site.domain}: [${statuses}]. Showing: ${setupInfo.setup_status}`, {
+            domain: site.domain,
+            totalEntries: domainSetups.length,
+            selectedStatus: setupInfo.setup_status,
+            allStatuses: statuses
+          });
+        }
+      }
+      
       return {
         ...site,
         setupInfo: setupInfo || null,
