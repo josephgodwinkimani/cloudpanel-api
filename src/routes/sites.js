@@ -285,7 +285,15 @@ async function readDirectory(dirPath) {
     }
   } else {
     // Production mode - Local execution
-    return await fs.readdir(dirPath);
+    try {
+      const items = await fs.readdir(dirPath);
+      
+      // In production mode, we want to return all items (both files and directories)
+      // The filtering will be done by the caller using getStats()
+      return items;
+    } catch (error) {
+      throw new Error(`Local readdir failed: ${error.message}`);
+    }
   }
 }
 
@@ -685,16 +693,28 @@ async function getSitesList() {
           }
         }
 
-        const users = await readDirectory(homeDir);
-
-        for (const user of users) {
-          // Skip system directories and common non-user directories
-          if (
-            ["mysql", "setup", "clp", "lost+found", ".git"].includes(user) ||
-            user.startsWith(".")
-          ) {
+        const allUsers = await readDirectory(homeDir);
+        
+        // Filter to only get valid user directories (not files like .gitignore)
+        const users = [];
+        for (const user of allUsers) {
+          try {
+            const userPath = path.posix.join(homeDir, user);
+            const userStats = await getStats(userPath);
+            
+            // Only include if it's a directory and not a system/hidden directory
+            if (userStats.isDirectory() && 
+                !["mysql", "setup", "clp", "lost+found", ".git"].includes(user) &&
+                !user.startsWith(".")) {
+              users.push(user);
+            }
+          } catch (err) {
+            // Skip entries we can't stat or that don't exist
             continue;
           }
+        }
+
+        for (const user of users) {
 
           const userPath = path.posix.join(homeDir, user);
 
@@ -715,7 +735,24 @@ async function getSitesList() {
           }
 
           try {
-            const domains = await readDirectory(sitesDir);
+            const allDomains = await readDirectory(sitesDir);
+            
+            // Filter to only get valid domain directories (not files like .gitignore)
+            const domains = [];
+            for (const domain of allDomains) {
+              try {
+                const domainPath = path.posix.join(sitesDir, domain);
+                const domainStats = await getStats(domainPath);
+                
+                // Only include if it's a directory and not a hidden file
+                if (domainStats.isDirectory() && !domain.startsWith(".")) {
+                  domains.push(domain);
+                }
+              } catch (err) {
+                // Skip entries we can't stat or that don't exist
+                continue;
+              }
+            }
 
             for (const domain of domains) {
               try {
@@ -766,7 +803,11 @@ async function getDomainInfo(domainPath, domainName, userName) {
     let hasSSL = false;
 
     try {
-      const files = await readDirectory(domainPath);
+      const allFiles = await readDirectory(domainPath);
+      
+      // Filter out hidden files and directories for site type detection
+      const files = allFiles.filter(file => !file.startsWith('.'));
+      
       siteType = await detectSiteType(domainPath, files);
     } catch (err) {
       // Can't read directory contents
@@ -1162,7 +1203,7 @@ function getFrameworkInfo(detectedType) {
   };
 }
 
-// Calculate directory size (simplified version)
+// Calculate directory size (optimized version)
 async function getDirSize(dirPath) {
   try {
     if (isDevelopment) {
@@ -1171,29 +1212,60 @@ async function getDirSize(dirPath) {
       const result = await executeSshCommand(command);
       return parseInt(result.output.trim()) || 0;
     } else {
-      // Production mode - Local execution - simplified calculation
-      let totalSize = 0;
-      const files = await fs.readdir(dirPath);
-
-      for (const file of files.slice(0, 100)) {
-        // Limit to first 100 files for performance
-        try {
-          const filePath = path.join(dirPath, file);
-          const stats = await fs.stat(filePath);
-          if (stats.isFile()) {
-            totalSize += stats.size;
-          }
-        } catch (err) {
-          // Skip files we can't read
-        }
-      }
-
-      return totalSize;
+      // Production mode - Local execution with recursive calculation
+      return await calculateDirSizeRecursive(dirPath);
     }
   } catch (error) {
     logger.warn(
       `Error calculating directory size for ${dirPath}: ${error.message}`
     );
+    return 0;
+  }
+}
+
+// Recursive function to calculate directory size in production mode
+async function calculateDirSizeRecursive(dirPath, maxDepth = 3, currentDepth = 0) {
+  try {
+    let totalSize = 0;
+    
+    // Prevent infinite recursion and excessive depth
+    if (currentDepth > maxDepth) {
+      return 0;
+    }
+    
+    const items = await fs.readdir(dirPath);
+    
+    // Process items in batches to avoid overwhelming the system
+    const batchSize = 50;
+    for (let i = 0; i < Math.min(items.length, 500); i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      
+      for (const item of batch) {
+        try {
+          // Skip hidden files and directories for performance
+          if (item.startsWith('.')) {
+            continue;
+          }
+          
+          const itemPath = path.join(dirPath, item);
+          const stats = await fs.stat(itemPath);
+          
+          if (stats.isFile()) {
+            totalSize += stats.size;
+          } else if (stats.isDirectory()) {
+            // Recursively calculate subdirectory size with depth limit
+            const subDirSize = await calculateDirSizeRecursive(itemPath, maxDepth, currentDepth + 1);
+            totalSize += subDirSize;
+          }
+        } catch (err) {
+          // Skip files/directories we can't access
+          continue;
+        }
+      }
+    }
+    
+    return totalSize;
+  } catch (error) {
     return 0;
   }
 }
