@@ -128,6 +128,10 @@ async function initializeApp() {
   // Authentication logging middleware
   app.use("/api/", authLoggingMiddleware);
 
+  // Special routes without API key authentication (must be before API auth middleware)
+  // Retry endpoint for frontend use - no API key required
+  app.use("/api/setup", setupRoutes);
+
   // API authentication (optional in development)
   app.use("/api/", authenticateApiKey);
 
@@ -139,7 +143,6 @@ async function initializeApp() {
   app.use("/api/site", siteRoutes);
   app.use("/api/user", userRoutes);
   app.use("/api/vhost-templates", vhostTemplateRoutes);
-  app.use("/api/setup", setupRoutes);
 
   // Authentication and documentation routes
   app.use("/auth", authRoutes);

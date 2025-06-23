@@ -399,6 +399,55 @@ class DatabaseService {
     });
   }
 
+  // Get setup by ID
+  getSetupById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        'SELECT * FROM setups WHERE id = ?',
+        [id],
+        (err, row) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(row);
+          }
+        }
+      );
+    });
+  }
+
+  // Update setup status
+  updateSetupStatus(id, status, errorMessage = null, jobId = null) {
+    return new Promise((resolve, reject) => {
+      const fields = ['setup_status = ?'];
+      const values = [status];
+      
+      if (errorMessage !== null) {
+        fields.push('error_message = ?');
+        values.push(errorMessage);
+      }
+      
+      if (jobId !== null) {
+        fields.push('job_id = ?');
+        values.push(jobId);
+      }
+      
+      values.push(id);
+      
+      this.db.run(
+        `UPDATE setups SET ${fields.join(', ')} WHERE id = ?`,
+        values,
+        function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(this.changes);
+          }
+        }
+      );
+    });
+  }
+
   // Update setup record
   updateSetup(id, updateData) {
     return new Promise((resolve, reject) => {
@@ -617,6 +666,68 @@ class DatabaseService {
           }
         }
       );
+    });
+  }
+
+  // Cleanup duplicate setups for the same domain (keep only the latest)
+  cleanupDuplicateSetups() {
+    return new Promise((resolve, reject) => {
+      // Find domains with multiple setups
+      const findDuplicatesQuery = `
+        SELECT domain_name, COUNT(*) as count 
+        FROM setups 
+        GROUP BY domain_name 
+        HAVING COUNT(*) > 1
+      `;
+      
+      this.db.all(findDuplicatesQuery, [], (err, duplicates) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        
+        if (duplicates.length === 0) {
+          resolve({ cleaned: 0, message: 'No duplicate setups found' });
+          return;
+        }
+        
+        let cleanedCount = 0;
+        let processedDomains = 0;
+        
+        // For each domain with duplicates, keep only the latest one
+        duplicates.forEach((duplicate) => {
+          const deleteOldQuery = `
+            DELETE FROM setups 
+            WHERE domain_name = ? 
+            AND id NOT IN (
+              SELECT id FROM setups 
+              WHERE domain_name = ? 
+              ORDER BY created_at DESC 
+              LIMIT 1
+            )
+          `;
+          
+          this.db.run(deleteOldQuery, [duplicate.domain_name, duplicate.domain_name], function(deleteErr) {
+            if (deleteErr) {
+              console.error(`Error cleaning duplicates for ${duplicate.domain_name}:`, deleteErr);
+            } else {
+              cleanedCount += this.changes;
+              console.log(`Cleaned ${this.changes} duplicate setups for domain: ${duplicate.domain_name}`);
+            }
+            
+            processedDomains++;
+            
+            // If all domains processed, resolve
+            if (processedDomains === duplicates.length) {
+              resolve({ 
+                cleaned: cleanedCount, 
+                domainsProcessed: processedDomains,
+                message: `Cleaned ${cleanedCount} duplicate setups across ${processedDomains} domains`
+              });
+            }
+          });
+        });
+      });
     });
   }
 

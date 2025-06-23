@@ -48,6 +48,21 @@ const authenticateApiKey = (req, res, next) => {
 };
 
 /**
+ * Conditional API Key authentication middleware
+ * Skips authentication for specific endpoints like retry
+ */
+const conditionalApiKeyAuth = (req, res, next) => {
+  // Skip API key authentication for retry endpoints
+  if (req.path.includes('/api/setup/retry/')) {
+    logger.info(`Skipping API key authentication for retry endpoint: ${req.path}`);
+    return next();
+  }
+
+  // Apply normal API key authentication for other endpoints
+  return authenticateApiKey(req, res, next);
+};
+
+/**
  * Enhanced rate limiting for different endpoint types
  */
 const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100, message = 'Too many requests') => {
@@ -161,6 +176,7 @@ const requireAuth = (req, res, next) => {
 
 module.exports = {
   authenticateApiKey,
+  conditionalApiKeyAuth,
   requireAuth,
   createRateLimit,
   strictRateLimit,

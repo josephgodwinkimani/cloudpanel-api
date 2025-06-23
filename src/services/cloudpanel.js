@@ -204,10 +204,7 @@ class CloudPanelService {
               conn.end();
               return reject({
                 success: false,
-                error: ResponseUtils.formatError({
-                  error: `SSH exec error: ${err.message}`,
-                  stderr: err.message,
-                }),
+                error: `SSH exec error: ${err.message}`,
                 command: command,
                 exitCode: 1,
               });
@@ -237,14 +234,15 @@ class CloudPanelService {
                     `SSH command failed with code ${code}: ${command}`,
                     output
                   );
+                  
+                  // Parse error output for better error messages
+                  const parsedError = this.parseErrorMessage(output, hasError
+                    ? `Command error detected: ${output.trim()}`
+                    : `Command failed with exit code ${code}`);
+                  
                   reject({
                     success: false,
-                    error: ResponseUtils.formatError({
-                      error: hasError
-                        ? `Command error detected: ${output.trim()}`
-                        : `Command failed with exit code ${code}`,
-                      stderr: stderr || output,
-                    }),
+                    error: parsedError,
                     command: command,
                     exitCode: code,
                     stdout: stdout,
@@ -287,10 +285,7 @@ class CloudPanelService {
           logger.error(`SSH connection error: ${err.message}`, err);
           reject({
             success: false,
-            error: ResponseUtils.formatError({
-              error: `SSH connection failed: ${err.message}`,
-              stderr: err.message,
-            }),
+            error: `SSH connection failed: ${err.message}`,
             command: command,
             exitCode: 1,
           });
@@ -322,10 +317,7 @@ class CloudPanelService {
               conn.end();
               return reject({
                 success: false,
-                error: ResponseUtils.formatError({
-                  error: `SSH exec error: ${err.message}`,
-                  stderr: err.message,
-                }),
+                error: `SSH exec error: ${err.message}`,
                 command: command,
                 exitCode: 1,
               });
@@ -361,14 +353,15 @@ class CloudPanelService {
                     `SSH command failed with code ${code}: ${command}`,
                     output
                   );
+                  
+                  // Parse error output for better error messages
+                  const parsedError = this.parseErrorMessage(output, hasError
+                    ? `Command error detected: ${output.trim()}`
+                    : `Command failed with exit code ${code}`);
+                  
                   reject({
                     success: false,
-                    error: ResponseUtils.formatError({
-                      error: hasError
-                        ? `Command error detected: ${output.trim()}`
-                        : `Command failed with exit code ${code}`,
-                      stderr: stderr || output,
-                    }),
+                    error: parsedError,
                     command: command,
                     exitCode: code,
                     stdout: stdout,
@@ -411,10 +404,7 @@ class CloudPanelService {
           logger.error(`SSH connection error: ${err.message}`, err);
           reject({
             success: false,
-            error: ResponseUtils.formatError({
-              error: `SSH connection failed: ${err.message}`,
-              stderr: err.message,
-            }),
+            error: `SSH connection failed: ${err.message}`,
             command: command,
             exitCode: 1,
           });
@@ -465,11 +455,45 @@ class CloudPanelService {
    * @returns {string} - Parsed error message
    */
   parseErrorMessage(output, defaultError = "Command failed") {
+    if (!output || typeof output !== 'string') {
+      return defaultError;
+    }
+
     // Check for specific error patterns
     if (
       output.includes("This value already exists") ||
       output.includes("already exists")
     ) {
+      // Try to extract multiple field errors
+      const errors = [];
+      const lines = output.split("\n");
+      
+      for (const line of lines) {
+        // Match patterns like "fieldName: This value already exists" with optional prefixes
+        const fieldErrorMatch = line.match(/(?:Error:\s*)?(\w+):\s*This value already exists/);
+        if (fieldErrorMatch) {
+          errors.push(`${fieldErrorMatch[1]}: This value already exists.`);
+        } else if (line.includes(": This value already exists") || line.includes(": already exists")) {
+          // Clean up the line by removing common prefixes
+          const cleanedLine = line.replace(/^(Error:\s*|Warning:\s*|Info:\s*)/i, '').trim();
+          errors.push(cleanedLine);
+        }
+      }
+      
+      if (errors.length > 0) {
+        return errors.join("\n");
+      }
+      
+      // Fallback to single field detection in the entire output
+      const fieldMatches = output.match(/(\w+):\s*This value already exists/g);
+      if (fieldMatches) {
+        return fieldMatches.map(match => {
+          const fieldMatch = match.match(/(\w+):\s*This value already exists/);
+          return `${fieldMatch[1]}: This value already exists.`;
+        }).join("\n");
+      }
+      
+      // Legacy fallback for single field detection
       if (output.includes("domainName")) {
         return "domainName: This value already exists.";
       } else if (output.includes("databaseName")) {
@@ -481,16 +505,6 @@ class CloudPanelService {
       } else if (output.includes("siteUser")) {
         return "siteUser: This value already exists.";
       } else {
-        // Extract the specific field from clpctl output
-        const lines = output.split("\n");
-        for (const line of lines) {
-          if (
-            line.includes(": This value already exists") ||
-            line.includes(": already exists")
-          ) {
-            return line.trim();
-          }
-        }
         return "This value already exists.";
       }
     } else if (output.includes("Invalid PHP version")) {
@@ -519,8 +533,9 @@ class CloudPanelService {
       }
     }
 
-    // If no specific pattern matches, return the output or default error
-    return output.trim() || defaultError;
+    // If no specific pattern matches, try to clean up the output
+    const cleanedOutput = output.trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
+    return cleanedOutput || defaultError;
   }
 
   /**
@@ -915,11 +930,15 @@ class CloudPanelService {
           }
         );
 
+        // Parse error output for consistent error messages between dev/prod
+        const output = error.fullOutput || error.stdout + error.stderr || error.error || error.message || error;
+        const parsedError = this.parseErrorMessage(output, error.error || error.message || "Unknown error");
+
         // Return more detailed error information
         return {
           success: false,
           message: `Site creation failed for ${domainName}`,
-          error: error.error || error.message || error,
+          error: parsedError,
           stdout: error.stdout,
           stderr: error.stderr,
           fullOutput: error.fullOutput,
@@ -1099,11 +1118,15 @@ class CloudPanelService {
           }
         );
 
+        // Parse error output for consistent error messages between dev/prod
+        const output = error.fullOutput || error.stdout + error.stderr || error.error || error.message || error;
+        const parsedError = this.parseErrorMessage(output, error.error || error.message || "Unknown error");
+
         // Return more detailed error information
         return {
           success: false,
           message: `Database creation failed for ${domainName}`,
-          error: error.error || error.message || error,
+          error: parsedError,
           stdout: error.stdout,
           stderr: error.stderr,
           fullOutput: error.fullOutput,

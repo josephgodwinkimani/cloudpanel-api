@@ -1637,44 +1637,52 @@ router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
 
     // If requested, also try to delete from CloudPanel
     if (deleteFromCloudPanel && setupToDelete.domain_name) {
-      try {
-        logger.info(`Attempting to delete site from CloudPanel: ${setupToDelete.domain_name}`);
-        
-        // Try to delete the site from CloudPanel
-        const deleteResult = await cloudpanel.deleteSite(setupToDelete.domain_name, true);
-        
-        if (deleteResult && typeof deleteResult === 'string' && deleteResult.includes("has been deleted")) {
-          cloudPanelResult = { success: true, message: deleteResult };
-          cloudPanelMessage = `Site '${setupToDelete.domain_name}' successfully deleted from CloudPanel.`;
-          logger.success(`Site ${setupToDelete.domain_name} deleted from CloudPanel successfully`);
-        } else if (deleteResult && deleteResult.error) {
-          // Site deletion failed, but continue with database deletion
-          cloudPanelResult = { success: false, error: deleteResult.error };
-          if (deleteResult.error.includes("not found") || 
-              deleteResult.error.includes("does not exist") ||
-              deleteResult.error.includes("No site found")) {
+      // Only delete from CloudPanel if setup status is "completed"
+      if (setupToDelete.setup_status === 'completed') {
+        try {
+          logger.info(`Setup status is completed. Attempting to delete site from CloudPanel: ${setupToDelete.domain_name}`);
+          
+          // Try to delete the site from CloudPanel
+          const deleteResult = await cloudpanel.deleteSite(setupToDelete.domain_name, true);
+          
+          if (deleteResult && typeof deleteResult === 'string' && deleteResult.includes("has been deleted")) {
+            cloudPanelResult = { success: true, message: deleteResult };
+            cloudPanelMessage = `Site '${setupToDelete.domain_name}' successfully deleted from CloudPanel.`;
+            logger.success(`Site ${setupToDelete.domain_name} deleted from CloudPanel successfully`);
+          } else if (deleteResult && deleteResult.error) {
+            // Site deletion failed, but continue with database deletion
+            cloudPanelResult = { success: false, error: deleteResult.error };
+            if (deleteResult.error.includes("not found") || 
+                deleteResult.error.includes("does not exist") ||
+                deleteResult.error.includes("No site found")) {
+              cloudPanelMessage = `Site '${setupToDelete.domain_name}' not found in CloudPanel (may have been deleted manually).`;
+            } else {
+              cloudPanelMessage = `Failed to delete site '${setupToDelete.domain_name}' from CloudPanel: ${deleteResult.error}`;
+            }
+            logger.warn(`CloudPanel site deletion warning for ${setupToDelete.domain_name}: ${deleteResult.error}`);
+          } else {
+            cloudPanelResult = { success: false, error: "Unknown response from CloudPanel" };
+            cloudPanelMessage = `Unexpected response when deleting site '${setupToDelete.domain_name}' from CloudPanel.`;
+            logger.warn(`Unexpected CloudPanel response for ${setupToDelete.domain_name}: ${deleteResult}`);
+          }
+        } catch (cloudPanelError) {
+          // CloudPanel deletion failed, but continue with database deletion
+          cloudPanelResult = { success: false, error: cloudPanelError.message };
+          if (cloudPanelError.message && 
+              (cloudPanelError.message.includes("not found") || 
+               cloudPanelError.message.includes("does not exist") ||
+               cloudPanelError.message.includes("No site found"))) {
             cloudPanelMessage = `Site '${setupToDelete.domain_name}' not found in CloudPanel (may have been deleted manually).`;
           } else {
-            cloudPanelMessage = `Failed to delete site '${setupToDelete.domain_name}' from CloudPanel: ${deleteResult.error}`;
+            cloudPanelMessage = `Error deleting site '${setupToDelete.domain_name}' from CloudPanel: ${cloudPanelError.message}`;
           }
-          logger.warn(`CloudPanel site deletion warning for ${setupToDelete.domain_name}: ${deleteResult.error}`);
-        } else {
-          cloudPanelResult = { success: false, error: "Unknown response from CloudPanel" };
-          cloudPanelMessage = `Unexpected response when deleting site '${setupToDelete.domain_name}' from CloudPanel.`;
-          logger.warn(`Unexpected CloudPanel response for ${setupToDelete.domain_name}: ${deleteResult}`);
+          logger.error(`CloudPanel deletion error for ${setupToDelete.domain_name}: ${cloudPanelError.message}`);
         }
-      } catch (cloudPanelError) {
-        // CloudPanel deletion failed, but continue with database deletion
-        cloudPanelResult = { success: false, error: cloudPanelError.message };
-        if (cloudPanelError.message && 
-            (cloudPanelError.message.includes("not found") || 
-             cloudPanelError.message.includes("does not exist") ||
-             cloudPanelError.message.includes("No site found"))) {
-          cloudPanelMessage = `Site '${setupToDelete.domain_name}' not found in CloudPanel (may have been deleted manually).`;
-        } else {
-          cloudPanelMessage = `Error deleting site '${setupToDelete.domain_name}' from CloudPanel: ${cloudPanelError.message}`;
-        }
-        logger.error(`CloudPanel deletion error for ${setupToDelete.domain_name}: ${cloudPanelError.message}`);
+      } else {
+        // Setup status is not completed, skip CloudPanel deletion
+        cloudPanelResult = { success: true, skipped: true };
+        cloudPanelMessage = `Setup status is '${setupToDelete.setup_status}', skipping CloudPanel deletion for '${setupToDelete.domain_name}'.`;
+        logger.info(`Skipping CloudPanel deletion for ${setupToDelete.domain_name} - setup status: ${setupToDelete.setup_status}`);
       }
     }
 
