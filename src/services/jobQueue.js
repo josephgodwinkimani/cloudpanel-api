@@ -871,6 +871,255 @@ class JobQueue {
   }
 
   /**
+   * Process git pull job
+   */
+  async processGitPullJob(job) {
+    const startTime = Date.now();
+    const data = JSON.parse(job.data);
+    const { siteUser, domainName, sitePath } = data;
+
+    logger.info(
+      `Processing git pull job ${job.id} for domain: ${domainName}`
+    );
+
+    try {
+      const { exec } = require("child_process");
+      const { promisify } = require("util");
+      const execAsync = promisify(exec);
+
+      // SSH configuration
+      const sshCommand = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+      
+      // Development mode check
+      const isDevelopment = process.env.NODE_ENV === "development";
+
+      // Import SSH execution function from sites.js - reuse existing infrastructure
+      const { Client } = require("ssh2");
+      
+      // SSH configuration for development mode (same as sites.js)
+      const sshConfig = {
+        host: process.env.VPS_HOST || "localhost",
+        user: process.env.VPS_USER || "root",
+        port: process.env.VPS_PORT || 22,
+        password: process.env.VPS_PASSWORD || null,
+      };
+
+      // Validate SSH configuration in development mode
+      const validateSshConfig = () => {
+        if (!isDevelopment) {
+          return true;
+        }
+
+        if (!sshConfig.host) {
+          throw new Error("Development mode requires VPS_HOST environment variable");
+        }
+
+        if (!sshConfig.user) {
+          throw new Error("Development mode requires VPS_USER environment variable");
+        }
+
+        if (!sshConfig.password) {
+          throw new Error("Development mode requires VPS_PASSWORD environment variable");
+        }
+
+        return true;
+      };
+
+      // Create SSH connection (similar to sites.js)
+      const getSshConnection = () => {
+        return new Promise((resolve, reject) => {
+          const conn = new Client();
+
+          const connectionTimeout = setTimeout(() => {
+            conn.destroy();
+            reject(new Error("SSH connection timeout"));
+          }, 10000);
+
+          conn
+            .on("ready", () => {
+              clearTimeout(connectionTimeout);
+              conn.isConnected = true;
+              resolve(conn);
+            })
+            .on("error", (err) => {
+              clearTimeout(connectionTimeout);
+              reject(err);
+            })
+            .connect({
+              host: sshConfig.host,
+              port: sshConfig.port,
+              username: sshConfig.user,
+              password: sshConfig.password,
+              readyTimeout: 10000,
+              keepaliveInterval: 30000,
+              keepaliveCountMax: 3,
+            });
+        });
+      };
+
+      // Execute SSH command (similar to sites.js)
+      const executeSshCommand = async (command) => {
+        if (!isDevelopment) {
+          throw new Error("SSH execution only available in development mode");
+        }
+
+        // Validate SSH configuration
+        validateSshConfig();
+
+        const conn = await getSshConnection();
+
+        return new Promise((resolve, reject) => {
+          conn.exec(command, (err, stream) => {
+            if (err) {
+              conn.end();
+              return reject({
+                success: false,
+                error: `SSH exec error: ${err.message}`,
+                command: command,
+              });
+            }
+
+            let stdout = "";
+            let stderr = "";
+
+            stream
+              .on("close", (code, signal) => {
+                conn.end();
+                if (code !== 0) {
+                  reject({
+                    success: false,
+                    error: `Command failed with exit code ${code}`,
+                    stdout,
+                    stderr,
+                    command: command,
+                    exitCode: code,
+                  });
+                } else {
+                  resolve({
+                    success: true,
+                    output: stdout,
+                    stderr,
+                    command: command,
+                    exitCode: code,
+                  });
+                }
+              })
+              .on("data", (data) => {
+                stdout += data.toString();
+              })
+              .stderr.on("data", (data) => {
+                stderr += data.toString();
+              });
+          });
+        });
+      };
+
+      // Step 1: Get current branch and remote info
+      logger.info(`Getting git info for ${domainName}...`);
+      const gitInfoCommand = `su - ${siteUser} -c 'cd "${sitePath}" && echo "=== Current Branch ===" && GIT_SSH_COMMAND="${sshCommand}" git branch --show-current && echo "=== Remote Info ===" && GIT_SSH_COMMAND="${sshCommand}" git remote -v && echo "=== Status Before Pull ===" && GIT_SSH_COMMAND="${sshCommand}" git status --porcelain'`;
+
+      let gitInfo;
+      if (isDevelopment) {
+        const sshResult = await executeSshCommand(gitInfoCommand);
+        gitInfo = sshResult.output || "";
+      } else {
+        const result = await execAsync(gitInfoCommand);
+        gitInfo = result.stdout;
+      }
+
+      // Step 2: Perform the actual git pull
+      logger.info(`Performing git pull for ${domainName}...`);
+      const gitPullCommand = `su - ${siteUser} -c 'cd "${sitePath}" && GIT_SSH_COMMAND="${sshCommand}" git pull origin \$(git branch --show-current) 2>&1'`;
+
+      let pullResult;
+      if (isDevelopment) {
+        const sshResult = await executeSshCommand(gitPullCommand);
+        pullResult = sshResult.output || "";
+      } else {
+        try {
+          const result = await execAsync(gitPullCommand);
+          pullResult = result.stdout;
+        } catch (error) {
+          // Git pull might fail but still provide useful output in stderr
+          pullResult = error.stdout + "\n" + error.stderr;
+        }
+      }
+
+      // Step 3: Run Laravel optimization commands if it's a Laravel project
+      logger.info(`Running optimizations for ${domainName}...`);
+      let optimizationResult = "";
+      const laravelOptimizeCommand = `su - ${siteUser} -c 'cd "${sitePath}" && if [ -f "artisan" ]; then echo "=== Running Laravel optimizations ===" && composer install --no-dev --optimize-autoloader --quiet 2>&1 && php artisan optimize:clear 2>&1 && echo "Laravel optimizations completed"; else echo "Not a Laravel project, skipping optimizations"; fi'`;
+      
+      if (isDevelopment) {
+        const sshResult = await executeSshCommand(laravelOptimizeCommand);
+        optimizationResult = sshResult.output || "";
+      } else {
+        try {
+          const result = await execAsync(laravelOptimizeCommand);
+          optimizationResult = result.stdout;
+        } catch (error) {
+          optimizationResult = `Optimization error: ${error.stdout}\n${error.stderr}`;
+        }
+      }
+
+      // Step 4: Get status after pull
+      logger.info(`Getting final status for ${domainName}...`);
+      const gitStatusAfterCommand = `su - ${siteUser} -c 'cd "${sitePath}" && echo "=== Status After Pull ===" && GIT_SSH_COMMAND="${sshCommand}" git status --porcelain && echo "=== Latest Commits ===" && GIT_SSH_COMMAND="${sshCommand}" git log --oneline -5'`;
+
+      let statusAfter;
+      if (isDevelopment) {
+        const sshResult = await executeSshCommand(gitStatusAfterCommand);
+        statusAfter = sshResult.output || "";
+      } else {
+        const result = await execAsync(gitStatusAfterCommand);
+        statusAfter = result.stdout;
+      }
+
+      // Check if pull was successful
+      const isSuccessful =
+        pullResult.includes("Already up to date") ||
+        pullResult.includes("Fast-forward") ||
+        pullResult.includes("Updating") ||
+        (!pullResult.toLowerCase().includes("error") && !pullResult.toLowerCase().includes("fatal"));
+
+      const result = {
+        domainName,
+        siteUser,
+        sitePath,
+        status: isSuccessful ? "completed" : "completed_with_issues",
+        executionTime: Date.now() - startTime,
+        gitInfo: gitInfo?.trim(),
+        pullOutput: pullResult?.trim(),
+        optimizationOutput: optimizationResult?.trim(),
+        statusAfter: statusAfter?.trim(),
+        timestamp: new Date().toISOString(),
+      };
+
+      logger.info(
+        `Git pull job ${job.id} ${isSuccessful ? "completed successfully" : "completed with issues"} for ${domainName}`
+      );
+
+      await this.updateJobStatus(job.id, "completed", result);
+      return result;
+    } catch (error) {
+      logger.error(`Git pull job ${job.id} failed for domain ${domainName}:`, error);
+
+      const result = {
+        domainName,
+        siteUser,
+        sitePath,
+        status: "failed",
+        executionTime: Date.now() - startTime,
+        errorMessage: error.message || "Unknown error occurred during git pull",
+        timestamp: new Date().toISOString(),
+      };
+
+      await this.updateJobStatus(job.id, "failed", result, error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Process a single job
    */
   async processJob(job) {
@@ -884,6 +1133,9 @@ class JobQueue {
           break;
         case "setup_laravel_step":
           result = await this.processSetupStepJob(job);
+          break;
+        case "git_pull":
+          result = await this.processGitPullJob(job);
           break;
         default:
           throw new Error(`Unknown job type: ${job.type}`);

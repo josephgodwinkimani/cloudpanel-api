@@ -797,83 +797,8 @@ function generateMockLogs() {
   });
 }
 
-// Helper function to check if we should skip this log entry
-function shouldSkipLogEntry(line) {
-  const lowerLine = line.toLowerCase();
-  
-  // Skip Chrome DevTools and browser auto-requests
-  const skipPatterns = [
-    'chrome-devtools://',
-    'devtools://',
-    'chrome-extension://',
-    'moz-extension://',
-    'safari-extension://',
-    'favicon.ico',
-    'manifest.json',
-    'service-worker',
-    'sw.js',
-    'robots.txt',
-    'sitemap.xml',
-    '.map',
-    'sourcemap',
-    '__webpack',
-    'hot-update',
-    'sockjs-node',
-    'ws://localhost',
-    'wss://localhost',
-    'localhost:3000',
-    'localhost:3001',
-    'hmr',
-    'hot-reload',
-    'livereload',
-    'browserify',
-    'parcel-hmr',
-    'vite',
-    '/health',
-    '/ping',
-    '/status',
-    'user-agent: chrome',
-    'user-agent: mozilla',
-    'user-agent: safari',
-    'user-agent: edge',
-    'preflight',
-    'options method',
-    'keep-alive',
-    'connection: close',
-    'accept-encoding: gzip',
-    'cache-control: no-cache'
-  ];
-  
-  return skipPatterns.some(pattern => lowerLine.includes(pattern));
-}
 
-// Helper function to check if we should skip based on message content
-function shouldSkipMessage(message) {
-  if (!message || typeof message !== 'string') return false;
-  
-  const lowerMessage = message.toLowerCase();
-  const skipMessages = [
-    'listening on port',
-    'server started',
-    'connected to database',
-    'middleware loaded',
-    'route registered',
-    'static files served',
-    'cors enabled',
-    'session configured',
-    'environment: development',
-    'environment: production',
-    'nodemon restarting',
-    'app crashed',
-    'waiting for changes',
-    'restarting due to changes',
-    'compiled successfully',
-    'webpack compiled',
-    'hot module replacement',
-    'live reload enabled'
-  ];
-  
-  return skipMessages.some(skipMsg => lowerMessage.includes(skipMsg));
-}
+
+
 
 module.exports = router;
