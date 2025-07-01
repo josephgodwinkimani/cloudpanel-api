@@ -2,12 +2,13 @@ const express = require("express");
 const fs = require("fs").promises;
 const path = require("path");
 const { Client } = require("ssh2");
-const { exec } = require('child_process');
-const { promisify } = require('util');
+const { exec } = require("child_process");
+const { promisify } = require("util");
 const logger = require("../utils/logger");
 const { requireAuth } = require("../middleware");
 const cloudpanel = require("../services/cloudpanel");
 const databaseService = require("../services/database");
+const jobQueue = require("../services/jobQueue");
 
 const router = express.Router();
 
@@ -289,7 +290,7 @@ async function readDirectory(dirPath) {
     // Production mode - Local execution
     try {
       const items = await fs.readdir(dirPath);
-      
+
       // In production mode, we want to return all items (both files and directories)
       // The filtering will be done by the caller using getStats()
       return items;
@@ -696,18 +697,20 @@ async function getSitesList() {
         }
 
         const allUsers = await readDirectory(homeDir);
-        
+
         // Filter to only get valid user directories (not files like .gitignore)
         const users = [];
         for (const user of allUsers) {
           try {
             const userPath = path.posix.join(homeDir, user);
             const userStats = await getStats(userPath);
-            
+
             // Only include if it's a directory and not a system/hidden directory
-            if (userStats.isDirectory() && 
-                !["mysql", "setup", "clp", "lost+found", ".git"].includes(user) &&
-                !user.startsWith(".")) {
+            if (
+              userStats.isDirectory() &&
+              !["mysql", "setup", "clp", "lost+found", ".git"].includes(user) &&
+              !user.startsWith(".")
+            ) {
               users.push(user);
             }
           } catch (err) {
@@ -717,7 +720,6 @@ async function getSitesList() {
         }
 
         for (const user of users) {
-
           const userPath = path.posix.join(homeDir, user);
 
           // Check different possible site directory structures
@@ -738,14 +740,14 @@ async function getSitesList() {
 
           try {
             const allDomains = await readDirectory(sitesDir);
-            
+
             // Filter to only get valid domain directories (not files like .gitignore)
             const domains = [];
             for (const domain of allDomains) {
               try {
                 const domainPath = path.posix.join(sitesDir, domain);
                 const domainStats = await getStats(domainPath);
-                
+
                 // Only include if it's a directory and not a hidden file
                 if (domainStats.isDirectory() && !domain.startsWith(".")) {
                   domains.push(domain);
@@ -806,10 +808,10 @@ async function getDomainInfo(domainPath, domainName, userName) {
 
     try {
       const allFiles = await readDirectory(domainPath);
-      
+
       // Filter out hidden files and directories for site type detection
-      const files = allFiles.filter(file => !file.startsWith('.'));
-      
+      const files = allFiles.filter((file) => !file.startsWith("."));
+
       siteType = await detectSiteType(domainPath, files);
     } catch (err) {
       // Can't read directory contents
@@ -1217,15 +1219,19 @@ async function getDirSize(dirPath) {
       // Production mode - Use native du command for accurate size calculation
       try {
         const execAsync = promisify(exec);
-        
+
         // Use du command which is more accurate and efficient than recursive JS
-        const { stdout } = await execAsync(`du -sb "${dirPath}" 2>/dev/null || echo "0"`);
-        const size = parseInt(stdout.trim().split('\t')[0]) || 0;
-        
+        const { stdout } = await execAsync(
+          `du -sb "${dirPath}" 2>/dev/null || echo "0"`
+        );
+        const size = parseInt(stdout.trim().split("\t")[0]) || 0;
+
         logger.debug(`Directory size for ${dirPath}: ${size} bytes`);
         return size;
       } catch (duError) {
-        logger.warn(`du command failed for ${dirPath}, falling back to recursive calculation: ${duError.message}`);
+        logger.warn(
+          `du command failed for ${dirPath}, falling back to recursive calculation: ${duError.message}`
+        );
         // Fallback to improved recursive calculation
         return await calculateDirSizeRecursive(dirPath);
       }
@@ -1242,12 +1248,12 @@ async function getDirSize(dirPath) {
 async function calculateDirSizeRecursive(dirPath, visitedInodes = new Set()) {
   try {
     let totalSize = 0;
-    
+
     // Get directory stats to check for hardlinks/symlinks
     let dirStats;
     try {
       dirStats = await fs.stat(dirPath);
-      
+
       // Prevent infinite loops from hardlinks and circular symlinks
       const inodeKey = `${dirStats.dev}-${dirStats.ino}`;
       if (visitedInodes.has(inodeKey)) {
@@ -1259,7 +1265,7 @@ async function calculateDirSizeRecursive(dirPath, visitedInodes = new Set()) {
       logger.warn(`Cannot stat directory ${dirPath}: ${statError.message}`);
       return 0;
     }
-    
+
     let items;
     try {
       items = await fs.readdir(dirPath);
@@ -1267,13 +1273,13 @@ async function calculateDirSizeRecursive(dirPath, visitedInodes = new Set()) {
       logger.warn(`Cannot read directory ${dirPath}: ${readError.message}`);
       return 0;
     }
-    
+
     // Process all items without artificial limitations
     for (const item of items) {
       try {
         const itemPath = path.join(dirPath, item);
         let stats;
-        
+
         // Use lstat to get symlink info without following it
         try {
           stats = await fs.lstat(itemPath);
@@ -1281,13 +1287,16 @@ async function calculateDirSizeRecursive(dirPath, visitedInodes = new Set()) {
           // Skip files/directories we can't access
           continue;
         }
-        
+
         if (stats.isFile()) {
           totalSize += stats.size;
         } else if (stats.isDirectory() && !stats.isSymbolicLink()) {
           // Recursively calculate subdirectory size
           // Pass the visitedInodes set to prevent infinite loops
-          const subDirSize = await calculateDirSizeRecursive(itemPath, visitedInodes);
+          const subDirSize = await calculateDirSizeRecursive(
+            itemPath,
+            visitedInodes
+          );
           totalSize += subDirSize;
         } else if (stats.isSymbolicLink()) {
           // For symlinks, add the size of the link itself (not the target)
@@ -1295,14 +1304,18 @@ async function calculateDirSizeRecursive(dirPath, visitedInodes = new Set()) {
         }
       } catch (err) {
         // Skip files/directories we can't access
-        logger.debug(`Skipping inaccessible item ${item} in ${dirPath}: ${err.message}`);
+        logger.debug(
+          `Skipping inaccessible item ${item} in ${dirPath}: ${err.message}`
+        );
         continue;
       }
     }
-    
+
     return totalSize;
   } catch (error) {
-    logger.warn(`Error in calculateDirSizeRecursive for ${dirPath}: ${error.message}`);
+    logger.warn(
+      `Error in calculateDirSizeRecursive for ${dirPath}: ${error.message}`
+    );
     return 0;
   }
 }
@@ -1329,7 +1342,7 @@ router.get("/", async (req, res) => {
     });
 
     const sites = await Promise.race([getSitesList(), timeoutPromise]);
-    
+
     // Get setup data from database
     let setupData = [];
     try {
@@ -1340,34 +1353,40 @@ router.get("/", async (req, res) => {
     }
 
     // Merge setup data with sites data
-    const sitesWithSetupInfo = sites.map(site => {
+    const sitesWithSetupInfo = sites.map((site) => {
       // Find all setups for this domain
-      const domainSetups = setupData.filter(setup => setup.domain_name === site.domain);
-      
+      const domainSetups = setupData.filter(
+        (setup) => setup.domain_name === site.domain
+      );
+
       let setupInfo = null;
       if (domainSetups.length > 0) {
         // Priority: completed > in_progress > failed
         // This ensures completed status is always shown when multiple entries exist
-        setupInfo = domainSetups.find(setup => setup.setup_status === 'completed') ||
-                   domainSetups.find(setup => setup.setup_status === 'in_progress') ||
-                   domainSetups.find(setup => setup.setup_status === 'failed');
-        
+        setupInfo =
+          domainSetups.find((setup) => setup.setup_status === "completed") ||
+          domainSetups.find((setup) => setup.setup_status === "in_progress") ||
+          domainSetups.find((setup) => setup.setup_status === "failed");
+
         // Log when multiple entries exist for debugging
         if (domainSetups.length > 1) {
-          const statuses = domainSetups.map(s => s.setup_status).join(', ');
-          logger.info(`Multiple setup entries found for domain ${site.domain}: [${statuses}]. Showing: ${setupInfo.setup_status}`, {
-            domain: site.domain,
-            totalEntries: domainSetups.length,
-            selectedStatus: setupInfo.setup_status,
-            allStatuses: statuses
-          });
+          const statuses = domainSetups.map((s) => s.setup_status).join(", ");
+          logger.info(
+            `Multiple setup entries found for domain ${site.domain}: [${statuses}]. Showing: ${setupInfo.setup_status}`,
+            {
+              domain: site.domain,
+              totalEntries: domainSetups.length,
+              selectedStatus: setupInfo.setup_status,
+              allStatuses: statuses,
+            }
+          );
         }
       }
-      
+
       return {
         ...site,
         setupInfo: setupInfo || null,
-        hasSetupInfo: !!setupInfo
+        hasSetupInfo: !!setupInfo,
       };
     });
 
@@ -1503,36 +1522,48 @@ router.delete("/api/:domain", requireAuth, async (req, res) => {
     let setupRecords = [];
     try {
       const allSetups = await databaseService.getAllSetups();
-      setupRecords = allSetups.filter(setup => setup.domain_name === domain);
-      logger.info(`Found ${setupRecords.length} setup record(s) for domain: ${domain}`);
+      setupRecords = allSetups.filter((setup) => setup.domain_name === domain);
+      logger.info(
+        `Found ${setupRecords.length} setup record(s) for domain: ${domain}`
+      );
     } catch (dbError) {
-      logger.warn(`Failed to check setup records for ${domain}: ${dbError.message}`);
+      logger.warn(
+        `Failed to check setup records for ${domain}: ${dbError.message}`
+      );
     }
 
     // Execute the site deletion using CloudPanel service
     const result = await cloudpanel.deleteSite(domain, force);
     console.log(result);
-    
+
     if (result.includes("has been deleted")) {
       logger.success(`Site ${domain} deleted successfully from CloudPanel`);
-      
+
       // Also delete setup records from database if they exist
       let deletedSetupRecords = 0;
       if (setupRecords.length > 0) {
         try {
           for (const setupRecord of setupRecords) {
-            const deletedCount = await databaseService.deleteSetup(setupRecord.id);
+            const deletedCount = await databaseService.deleteSetup(
+              setupRecord.id
+            );
             if (deletedCount > 0) {
               deletedSetupRecords++;
-              logger.info(`Deleted setup record ID ${setupRecord.id} for domain: ${domain}`);
+              logger.info(
+                `Deleted setup record ID ${setupRecord.id} for domain: ${domain}`
+              );
             }
           }
-          
+
           if (deletedSetupRecords > 0) {
-            logger.success(`Deleted ${deletedSetupRecords} setup record(s) for domain: ${domain}`);
+            logger.success(
+              `Deleted ${deletedSetupRecords} setup record(s) for domain: ${domain}`
+            );
           }
         } catch (dbError) {
-          logger.error(`Failed to delete setup records for ${domain}: ${dbError.message}`);
+          logger.error(
+            `Failed to delete setup records for ${domain}: ${dbError.message}`
+          );
           // Continue with success response even if database cleanup fails
         }
       }
@@ -1575,8 +1606,47 @@ router.delete("/api/:domain", requireAuth, async (req, res) => {
 // Route to display setup history page
 router.get("/setup-history", async (req, res) => {
   try {
+    // Get all setup records from database
     const setupData = await databaseService.getAllSetups();
     
+    // Get all sites with timeout protection
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
+    });
+    const sites = await Promise.race([getSitesList(), timeoutPromise]);
+
+    // Create sets for efficient lookup
+    const sitesDomains = new Set(sites.map(site => site.domain));
+    const dbDomains = new Set(setupData.map(setup => setup.domain_name));
+
+    // Find domains that exist in database but not in sites
+    const domainsToDelete = [...dbDomains].filter(domain => !sitesDomains.has(domain));
+
+    // Delete records for non-existent domains
+    if (domainsToDelete.length > 0) {
+      logger.info(`Found ${domainsToDelete.length} database records to delete for non-existent domains`);
+      
+      for (const domain of domainsToDelete) {
+        // Find all setup records for this domain
+        const recordsToDelete = setupData.filter(setup => setup.domain_name === domain);
+        
+        for (const record of recordsToDelete) {
+          try {
+            await databaseService.deleteSetup(record.id);
+            logger.success(`Deleted setup record ID ${record.id} for non-existent domain: ${domain}`);
+          } catch (deleteError) {
+            logger.error(`Failed to delete setup record ID ${record.id} for domain ${domain}: ${deleteError.message}`);
+          }
+        }
+      }
+      
+      // Refresh setup data after deletions
+      const updatedSetupData = await databaseService.getAllSetups();
+      setupData.length = 0;
+      setupData.push(...updatedSetupData);
+    }
+
+    // return res.json(setupData);
     // Helper function for formatting file size
     const formatFileSize = (bytes) => {
       if (bytes === 0) return "0 Bytes";
@@ -1595,9 +1665,9 @@ router.get("/setup-history", async (req, res) => {
       process: {
         env: {
           VPS_HOST: process.env.VPS_HOST || null,
-          NODE_ENV: process.env.NODE_ENV || 'development'
-        }
-      }
+          NODE_ENV: process.env.NODE_ENV || "development",
+        },
+      },
     });
   } catch (error) {
     logger.error(`Error loading setup history: ${error.message}`);
@@ -1634,7 +1704,7 @@ router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { deleteFromCloudPanel = true } = req.body; // Optional parameter to also delete from CloudPanel
-    
+
     // Validate ID
     if (!id || isNaN(parseInt(id))) {
       return res.status(400).json({
@@ -1645,8 +1715,8 @@ router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
 
     // Check if setup exists and get its details
     const setupData = await databaseService.getAllSetups();
-    const setupToDelete = setupData.find(setup => setup.id === parseInt(id));
-    
+    const setupToDelete = setupData.find((setup) => setup.id === parseInt(id));
+
     if (!setupToDelete) {
       return res.status(404).json({
         success: false,
@@ -1660,57 +1730,83 @@ router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
     // If requested, also try to delete from CloudPanel
     if (deleteFromCloudPanel && setupToDelete.domain_name) {
       // Only delete from CloudPanel if setup status is "completed"
-      if (setupToDelete.setup_status === 'completed') {
+      if (setupToDelete.setup_status === "completed") {
         try {
-          logger.info(`Setup status is completed. Attempting to delete site from CloudPanel: ${setupToDelete.domain_name}`);
-          
+          logger.info(
+            `Setup status is completed. Attempting to delete site from CloudPanel: ${setupToDelete.domain_name}`
+          );
+
           // Try to delete the site from CloudPanel
-          const deleteResult = await cloudpanel.deleteSite(setupToDelete.domain_name, true);
-          
-          if (deleteResult && typeof deleteResult === 'string' && deleteResult.includes("has been deleted")) {
+          const deleteResult = await cloudpanel.deleteSite(
+            setupToDelete.domain_name,
+            true
+          );
+
+          if (
+            deleteResult &&
+            typeof deleteResult === "string" &&
+            deleteResult.includes("has been deleted")
+          ) {
             cloudPanelResult = { success: true, message: deleteResult };
             cloudPanelMessage = `Site '${setupToDelete.domain_name}' successfully deleted from CloudPanel.`;
-            logger.success(`Site ${setupToDelete.domain_name} deleted from CloudPanel successfully`);
+            logger.success(
+              `Site ${setupToDelete.domain_name} deleted from CloudPanel successfully`
+            );
           } else if (deleteResult && deleteResult.error) {
             // Site deletion failed, but continue with database deletion
             cloudPanelResult = { success: false, error: deleteResult.error };
-            if (deleteResult.error.includes("not found") || 
-                deleteResult.error.includes("does not exist") ||
-                deleteResult.error.includes("No site found")) {
+            if (
+              deleteResult.error.includes("not found") ||
+              deleteResult.error.includes("does not exist") ||
+              deleteResult.error.includes("No site found")
+            ) {
               cloudPanelMessage = `Site '${setupToDelete.domain_name}' not found in CloudPanel (may have been deleted manually).`;
             } else {
               cloudPanelMessage = `Failed to delete site '${setupToDelete.domain_name}' from CloudPanel: ${deleteResult.error}`;
             }
-            logger.warn(`CloudPanel site deletion warning for ${setupToDelete.domain_name}: ${deleteResult.error}`);
+            logger.warn(
+              `CloudPanel site deletion warning for ${setupToDelete.domain_name}: ${deleteResult.error}`
+            );
           } else {
-            cloudPanelResult = { success: false, error: "Unknown response from CloudPanel" };
+            cloudPanelResult = {
+              success: false,
+              error: "Unknown response from CloudPanel",
+            };
             cloudPanelMessage = `Unexpected response when deleting site '${setupToDelete.domain_name}' from CloudPanel.`;
-            logger.warn(`Unexpected CloudPanel response for ${setupToDelete.domain_name}: ${deleteResult}`);
+            logger.warn(
+              `Unexpected CloudPanel response for ${setupToDelete.domain_name}: ${deleteResult}`
+            );
           }
         } catch (cloudPanelError) {
           // CloudPanel deletion failed, but continue with database deletion
           cloudPanelResult = { success: false, error: cloudPanelError.message };
-          if (cloudPanelError.message && 
-              (cloudPanelError.message.includes("not found") || 
-               cloudPanelError.message.includes("does not exist") ||
-               cloudPanelError.message.includes("No site found"))) {
+          if (
+            cloudPanelError.message &&
+            (cloudPanelError.message.includes("not found") ||
+              cloudPanelError.message.includes("does not exist") ||
+              cloudPanelError.message.includes("No site found"))
+          ) {
             cloudPanelMessage = `Site '${setupToDelete.domain_name}' not found in CloudPanel (may have been deleted manually).`;
           } else {
             cloudPanelMessage = `Error deleting site '${setupToDelete.domain_name}' from CloudPanel: ${cloudPanelError.message}`;
           }
-          logger.error(`CloudPanel deletion error for ${setupToDelete.domain_name}: ${cloudPanelError.message}`);
+          logger.error(
+            `CloudPanel deletion error for ${setupToDelete.domain_name}: ${cloudPanelError.message}`
+          );
         }
       } else {
         // Setup status is not completed, skip CloudPanel deletion
         cloudPanelResult = { success: true, skipped: true };
         cloudPanelMessage = `Setup status is '${setupToDelete.setup_status}', skipping CloudPanel deletion for '${setupToDelete.domain_name}'.`;
-        logger.info(`Skipping CloudPanel deletion for ${setupToDelete.domain_name} - setup status: ${setupToDelete.setup_status}`);
+        logger.info(
+          `Skipping CloudPanel deletion for ${setupToDelete.domain_name} - setup status: ${setupToDelete.setup_status}`
+        );
       }
     }
 
     // Delete the setup record from database
     const deletedCount = await databaseService.deleteSetup(parseInt(id));
-    
+
     if (deletedCount === 0) {
       return res.status(404).json({
         success: false,
@@ -1718,7 +1814,9 @@ router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
       });
     }
 
-    logger.info(`Setup record deleted from database: ID ${id}, Domain: ${setupToDelete.domain_name}`);
+    logger.info(
+      `Setup record deleted from database: ID ${id}, Domain: ${setupToDelete.domain_name}`
+    );
 
     // Prepare response message
     let responseMessage = "Setup record deleted successfully from database.";
@@ -1734,24 +1832,23 @@ router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
         deletedSetup: {
           id: setupToDelete.id,
           domain_name: setupToDelete.domain_name,
-          created_at: setupToDelete.created_at
-        }
-      }
+          created_at: setupToDelete.created_at,
+        },
+      },
     };
 
     if (deleteFromCloudPanel) {
-      responseData.cloudPanel = cloudPanelResult || { 
-        success: false, 
-        message: "CloudPanel deletion was not attempted" 
+      responseData.cloudPanel = cloudPanelResult || {
+        success: false,
+        message: "CloudPanel deletion was not attempted",
       };
     }
 
     res.json({
       success: true,
       message: responseMessage,
-      data: responseData
+      data: responseData,
     });
-
   } catch (error) {
     logger.error(`Error deleting setup record: ${error.message}`);
     res.status(500).json({
@@ -1759,6 +1856,173 @@ router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
       message: "Failed to delete setup record",
       error: error.message,
     });
+  }
+});
+
+// Route to perform git pull for a specific site (background processing)
+router.post(
+  "/:siteUser/:domainName/git-pull",
+  requireAuth,
+  async (req, res) => {
+    const jobQueue = require("../services/jobQueue");
+
+    try {
+      const { siteUser, domainName } = req.params;
+
+      // Validate parameters
+      if (!siteUser || !domainName) {
+        return res.status(400).json({
+          success: false,
+          message: "Site user and domain name are required",
+        });
+      }
+
+      logger.info(
+        `Git pull requested for domain: ${domainName}, user: ${siteUser}`
+      );
+
+      // Construct the site path for validation
+      const sitePath = `/home/${siteUser}/htdocs/${domainName}`;
+
+      // Quick validation - check if site directory exists and is a git repository
+      const checkGitCommand = `su - ${siteUser} -c 'if [ -d "${sitePath}" ]; then cd "${sitePath}" && if [ -d ".git" ]; then echo "GIT_REPO_EXISTS"; else echo "NOT_A_GIT_REPO"; fi; else echo "SITE_NOT_FOUND"; fi'`;
+
+      let checkResult;
+      if (isDevelopment) {
+        const sshResult = await executeSshCommand(checkGitCommand);
+        checkResult = sshResult.output || sshResult.stdout || "";
+      } else {
+        // In production, execute locally
+        const execAsync = promisify(exec);
+        const result = await execAsync(checkGitCommand);
+        checkResult = result.stdout.trim();
+      }
+
+      // Ensure checkResult is a string
+      if (typeof checkResult !== "string") {
+        checkResult = String(checkResult);
+      }
+
+      // Handle validation errors immediately
+      if (checkResult.includes("SITE_NOT_FOUND")) {
+        return res.status(404).json({
+          success: false,
+          message: `Site directory not found: ${sitePath}`,
+          details: {
+            sitePath,
+            siteUser,
+            domainName,
+          },
+        });
+      }
+
+      if (checkResult.includes("NOT_A_GIT_REPO")) {
+        return res.status(400).json({
+          success: false,
+          message: `Directory exists but is not a git repository: ${sitePath}`,
+          details: {
+            sitePath,
+            siteUser,
+            domainName,
+            suggestion:
+              "This site was not created from a git repository or the .git directory is missing",
+          },
+        });
+      }
+
+      // If it's a valid git repository, add job to queue
+      if (checkResult.includes("GIT_REPO_EXISTS")) {
+        // Create job data
+        const jobData = {
+          siteUser,
+          domainName,
+          sitePath,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Add job to queue with high priority (0 = highest priority)
+        const job = await jobQueue.addJob("git_pull", jobData, 0);
+
+        logger.info(
+          `Git pull job queued for domain: ${domainName}, job ID: ${job.id}`
+        );
+
+        return res.json({
+          success: true,
+          message: `Git pull job has been queued and will be processed in the background`,
+          jobId: job.id,
+          details: {
+            sitePath,
+            siteUser,
+            domainName,
+            jobType: "git_pull",
+            queuePosition: "High priority",
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
+
+      // Fallback case
+      return res.status(500).json({
+        success: false,
+        message: "Unexpected error occurred while checking git repository",
+        details: {
+          checkResult,
+          sitePath,
+          siteUser,
+          domainName,
+        },
+      });
+    } catch (error) {
+      logger.error(
+        `Error queuing git pull for ${req.params.domainName}: ${error.message}`
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to queue git pull job",
+        error: error.message,
+        details: {
+          siteUser: req.params.siteUser,
+          domainName: req.params.domainName,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+  }
+);
+
+// Batch git pull for completed sites
+router.post("/batch-git-pull", requireAuth, async (req, res) => {
+  try {
+    const { sites } = req.body;
+    if (!Array.isArray(sites) || sites.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "No sites provided for batch git pull" });
+    }
+
+    // Add git pull jobs to queue for each site
+    const jobPromises = sites.map((site) => {
+      const sitePath = `/home/${site.siteUser}/htdocs/${site.domain}`;
+      const jobData = {
+        siteUser: site.siteUser,
+        domainName: site.domain,
+        sitePath: sitePath,
+        timestamp: new Date().toISOString(),
+      };
+      return jobQueue.addJob("git_pull", jobData, 0); // Priority 1 for background tasks
+    });
+
+    await Promise.all(jobPromises);
+
+    res.json({
+      message: "Batch git pull jobs queued successfully",
+      jobCount: sites.length,
+    });
+  } catch (error) {
+    logger.error("Error in batch git pull:", error);
+    res.status(500).json({ error: "Failed to queue batch git pull jobs" });
   }
 });
 
