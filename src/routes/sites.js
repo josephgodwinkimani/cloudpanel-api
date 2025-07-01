@@ -1603,6 +1603,43 @@ router.delete("/api/:domain", requireAuth, async (req, res) => {
   }
 });
 
+// Helper function to check git status
+async function checkGitStatus(sitePath, siteUser) {
+  try {
+    // Command to check if repo is up to date
+    const gitStatusCommand = `su - ${siteUser} -c 'cd "${sitePath}" && if [ -d ".git" ]; then 
+      git remote update > /dev/null 2>&1
+      LOCAL=$(git rev-parse @)
+      REMOTE=$(git rev-parse @{u})
+      BASE=$(git merge-base @ @{u})
+
+      if [ $LOCAL = $REMOTE ]; then
+        echo "up-to-date"
+      elif [ $LOCAL = $BASE ]; then
+        echo "need-pull"
+      elif [ $REMOTE = $BASE ]; then
+        echo "need-push"
+      else
+        echo "diverged"
+      fi
+    else
+      echo "not-git"
+    fi'`;
+
+    if (isDevelopment) {
+      const result = await executeSshCommand(gitStatusCommand);
+      return result.output.trim();
+    } else {
+      const execAsync = promisify(exec);
+      const result = await execAsync(gitStatusCommand);
+      return result.stdout.trim();
+    }
+  } catch (error) {
+    logger.warn(`Error checking git status for ${sitePath}: ${error.message}`);
+    return "error";
+  }
+}
+
 // Route to display setup history page
 router.get("/setup-history", async (req, res) => {
   try {
@@ -1646,7 +1683,27 @@ router.get("/setup-history", async (req, res) => {
       setupData.push(...updatedSetupData);
     }
 
-    // return res.json(setupData);
+    // Add git status information for each setup that has a completed status
+    const setupDataWithGit = await Promise.all(setupData.map(async (setup) => {
+      if (setup.setup_status === 'completed') {
+        const site = sites.find(s => s.domain === setup.domain_name);
+        if (site) {
+          const sitePath = `/home/${site.user}/htdocs/${site.domain}`;
+          const gitStatus = await checkGitStatus(sitePath, site.user);
+          return {
+            ...setup,
+            gitStatus,
+            siteUser: site.user
+          };
+        }
+      }
+      return {
+        ...setup,
+        gitStatus: 'not-available',
+        siteUser: null
+      };
+    }));
+
     // Helper function for formatting file size
     const formatFileSize = (bytes) => {
       if (bytes === 0) return "0 Bytes";
@@ -1658,7 +1715,7 @@ router.get("/setup-history", async (req, res) => {
 
     res.render("setup-history", {
       title: "Setup History",
-      setupData: setupData,
+      setupData: setupDataWithGit,
       user: req.session.user,
       baseUrl: `${req.protocol}://${req.get("host")}`,
       formatFileSize: formatFileSize,
