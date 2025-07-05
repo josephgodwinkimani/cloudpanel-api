@@ -234,12 +234,15 @@ class CloudPanelService {
                     `SSH command failed with code ${code}: ${command}`,
                     output
                   );
-                  
+
                   // Parse error output for better error messages
-                  const parsedError = this.parseErrorMessage(output, hasError
-                    ? `Command error detected: ${output.trim()}`
-                    : `Command failed with exit code ${code}`);
-                  
+                  const parsedError = this.parseErrorMessage(
+                    output,
+                    hasError
+                      ? `Command error detected: ${output.trim()}`
+                      : `Command failed with exit code ${code}`
+                  );
+
                   reject({
                     success: false,
                     error: parsedError,
@@ -353,12 +356,15 @@ class CloudPanelService {
                     `SSH command failed with code ${code}: ${command}`,
                     output
                   );
-                  
+
                   // Parse error output for better error messages
-                  const parsedError = this.parseErrorMessage(output, hasError
-                    ? `Command error detected: ${output.trim()}`
-                    : `Command failed with exit code ${code}`);
-                  
+                  const parsedError = this.parseErrorMessage(
+                    output,
+                    hasError
+                      ? `Command error detected: ${output.trim()}`
+                      : `Command failed with exit code ${code}`
+                  );
+
                   reject({
                     success: false,
                     error: parsedError,
@@ -455,7 +461,7 @@ class CloudPanelService {
    * @returns {string} - Parsed error message
    */
   parseErrorMessage(output, defaultError = "Command failed") {
-    if (!output || typeof output !== 'string') {
+    if (!output || typeof output !== "string") {
       return defaultError;
     }
 
@@ -467,32 +473,43 @@ class CloudPanelService {
       // Try to extract multiple field errors
       const errors = [];
       const lines = output.split("\n");
-      
+
       for (const line of lines) {
         // Match patterns like "fieldName: This value already exists" with optional prefixes
-        const fieldErrorMatch = line.match(/(?:Error:\s*)?(\w+):\s*This value already exists/);
+        const fieldErrorMatch = line.match(
+          /(?:Error:\s*)?(\w+):\s*This value already exists/
+        );
         if (fieldErrorMatch) {
           errors.push(`${fieldErrorMatch[1]}: This value already exists.`);
-        } else if (line.includes(": This value already exists") || line.includes(": already exists")) {
+        } else if (
+          line.includes(": This value already exists") ||
+          line.includes(": already exists")
+        ) {
           // Clean up the line by removing common prefixes
-          const cleanedLine = line.replace(/^(Error:\s*|Warning:\s*|Info:\s*)/i, '').trim();
+          const cleanedLine = line
+            .replace(/^(Error:\s*|Warning:\s*|Info:\s*)/i, "")
+            .trim();
           errors.push(cleanedLine);
         }
       }
-      
+
       if (errors.length > 0) {
         return errors.join("\n");
       }
-      
+
       // Fallback to single field detection in the entire output
       const fieldMatches = output.match(/(\w+):\s*This value already exists/g);
       if (fieldMatches) {
-        return fieldMatches.map(match => {
-          const fieldMatch = match.match(/(\w+):\s*This value already exists/);
-          return `${fieldMatch[1]}: This value already exists.`;
-        }).join("\n");
+        return fieldMatches
+          .map((match) => {
+            const fieldMatch = match.match(
+              /(\w+):\s*This value already exists/
+            );
+            return `${fieldMatch[1]}: This value already exists.`;
+          })
+          .join("\n");
       }
-      
+
       // Legacy fallback for single field detection
       if (output.includes("domainName")) {
         return "domainName: This value already exists.";
@@ -534,7 +551,10 @@ class CloudPanelService {
     }
 
     // If no specific pattern matches, try to clean up the output
-    const cleanedOutput = output.trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
+    const cleanedOutput = output
+      .trim()
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\s+/g, " ");
     return cleanedOutput || defaultError;
   }
 
@@ -931,8 +951,16 @@ class CloudPanelService {
         );
 
         // Parse error output for consistent error messages between dev/prod
-        const output = error.fullOutput || error.stdout + error.stderr || error.error || error.message || error;
-        const parsedError = this.parseErrorMessage(output, error.error || error.message || "Unknown error");
+        const output =
+          error.fullOutput ||
+          error.stdout + error.stderr ||
+          error.error ||
+          error.message ||
+          error;
+        const parsedError = this.parseErrorMessage(
+          output,
+          error.error || error.message || "Unknown error"
+        );
 
         // Return more detailed error information
         return {
@@ -1119,8 +1147,16 @@ class CloudPanelService {
         );
 
         // Parse error output for consistent error messages between dev/prod
-        const output = error.fullOutput || error.stdout + error.stderr || error.error || error.message || error;
-        const parsedError = this.parseErrorMessage(output, error.error || error.message || "Unknown error");
+        const output =
+          error.fullOutput ||
+          error.stdout + error.stderr ||
+          error.error ||
+          error.message ||
+          error;
+        const parsedError = this.parseErrorMessage(
+          output,
+          error.error || error.message || "Unknown error"
+        );
 
         // Return more detailed error information
         return {
@@ -1308,6 +1344,17 @@ class CloudPanelService {
    * @param {string} siteUser - The user under which to run the command
    * @returns {Promise} - Promise that resolves with command output
    */
+  extractGitUrl(url) {
+    return url.split(" ").pop();
+  }
+  extractBranch(url) {
+    const parts = url.split(" ");
+    const bIndex = parts.indexOf("-b");
+    if (bIndex !== -1 && bIndex + 1 < parts.length) {
+      return parts[bIndex + 1];
+    }
+    return null;
+  }
   async cloneRepository(domainName, repositoryUrl, siteUser) {
     // Validate SSH configuration in development mode
     if (!this.validateSshConfig()) {
@@ -1321,12 +1368,15 @@ class CloudPanelService {
         exitCode: 1,
       });
     }
+    const repoUrl = this.extractGitUrl(repositoryUrl);
+    const isBranch = repositoryUrl.includes("-b") || false;
+    const branch = this.extractBranch(repositoryUrl) || "";
 
     const sshCommand =
       "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
     const sitePath = `/home/${siteUser}/htdocs/${domainName}`;
     const deleteCommand = `rm -rf ${sitePath}/* ${sitePath}/.* 2>/dev/null || true`;
-    const baseCommand = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone "${repositoryUrl}" .'`;
+    const baseCommand = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone${isBranch ? ` -b ${branch} --single-branch` : ""} "${repoUrl}" .'`;
 
     if (this.isDevelopment && this.sshConfig.host) {
       try {

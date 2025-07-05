@@ -138,7 +138,7 @@ const schemas = {
     databaseName: Joi.string().required(),
     databaseUserName: Joi.string().required(),
     databaseUserPassword: Joi.string().min(6).required(),
-    repositoryUrl: Joi.string().uri().optional(),
+    repositoryUrl: Joi.string().optional(),
     runMigrations: Joi.boolean().default(true),
     runSeeders: Joi.boolean().default(true),
     optimizeCache: Joi.boolean().default(true),
