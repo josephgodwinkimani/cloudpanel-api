@@ -1376,7 +1376,9 @@ class CloudPanelService {
       "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
     const sitePath = `/home/${siteUser}/htdocs/${domainName}`;
     const deleteCommand = `rm -rf ${sitePath}/* ${sitePath}/.* 2>/dev/null || true`;
-    const baseCommand = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone${isBranch ? ` -b ${branch} --single-branch` : ""} "${repoUrl}" .'`;
+    const baseCommand = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone${
+      isBranch ? ` -b ${branch} --single-branch` : ""
+    } "${repoUrl}" .'`;
 
     if (this.isDevelopment && this.sshConfig.host) {
       try {
@@ -1603,13 +1605,6 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
       commands.push(`${baseCommand} && php artisan db:seed --force'`);
     }
 
-    // Optimize cache
-    if (optimizeCache) {
-      commands.push(
-        `${baseCommand} && php artisan config:cache && php artisan route:cache && php artisan view:cache'`
-      );
-    }
-
     const baseFullCommand = commands.join(" && ");
 
     // Create a version of the command without composer install for logging
@@ -1624,11 +1619,7 @@ sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${dbPassword}/" .env'`;
       commandsForLogging.push(`${baseCommand} && php artisan db:seed --force'`);
     }
 
-    if (optimizeCache) {
-      commandsForLogging.push(
-        `${baseCommand} && php artisan config:cache && php artisan route:cache && php artisan view:cache'`
-      );
-    }
+    commandsForLogging.push(`${baseCommand} && php artisan optimize:clear'`);
 
     const commandForLogging =
       commandsForLogging.length > 0
