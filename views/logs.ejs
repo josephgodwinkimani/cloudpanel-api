@@ -167,7 +167,7 @@
                                     <div class="w-10 h-6 bg-gray-200 rounded-full shadow-inner"></div>
                                     <div class="dot absolute w-4 h-4 bg-white rounded-full shadow -left-1 -top-1 transition"></div>
                                 </div>
-                                <span class="ml-3 text-gray-700 text-sm">Auto-refresh (30s)</span>
+                                <span class="ml-3 text-gray-700 text-sm">Auto-refresh (2s)</span>
                             </label>
                         </div>
                         
@@ -271,15 +271,32 @@
                                     data-log-id="<%= log.id || index %>"
                                     data-timestamp="<%= log.timestamp %>">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <%= log.formattedTime || new Date(log.timestamp).toLocaleString('en-US', {
-                                            year: 'numeric',
-                                            month: '2-digit',
-                                            day: '2-digit',
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                            second: '2-digit',
-                                            hour12: false
-                                        }) %>
+                                        <% 
+                                        let displayTime;
+                                        try {
+                                            if (log.formattedTime) {
+                                                displayTime = log.formattedTime;
+                                            } else {
+                                                const logDate = new Date(log.timestamp);
+                                                if (isNaN(logDate.getTime())) {
+                                                    displayTime = 'Invalid Time';
+                                                } else {
+                                                    displayTime = logDate.toLocaleString('id-ID', {
+                                                        year: 'numeric',
+                                                        month: '2-digit',
+                                                        day: '2-digit',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        second: '2-digit',
+                                                        hour12: false
+                                                    });
+                                                }
+                                            }
+                                        } catch (e) {
+                                            displayTime = 'Invalid Time';
+                                        }
+                                        %>
+                                        <span title="<%= log.timestamp %>"><%= displayTime %></span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <% 
@@ -678,8 +695,209 @@
             window.location.href = `/logs?${params.toString()}`;
         }
 
-        function refreshLogs() {
-            location.reload();
+        async function refreshLogs() {
+            try {
+                // Show loading indicator
+                const refreshButton = document.querySelector('button[onclick="refreshLogs()"]');
+                const originalContent = refreshButton.innerHTML;
+                refreshButton.innerHTML = '<svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>Loading...';
+                refreshButton.disabled = true;
+
+                // Build URL with current filters
+                const urlParams = new URLSearchParams(window.location.search);
+                const params = new URLSearchParams();
+                if (urlParams.get('level')) params.set('level', urlParams.get('level'));
+                if (urlParams.get('type')) params.set('type', urlParams.get('type'));
+                if (urlParams.get('action')) params.set('action', urlParams.get('action'));
+                if (urlParams.get('search')) params.set('search', urlParams.get('search'));
+                if (urlParams.get('page')) params.set('page', urlParams.get('page'));
+
+                // Fetch new logs data
+                const response = await fetch(`/logs/api/data?${params.toString()}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    // Update logs table
+                    updateLogsTable(data.logs);
+                    
+                    // Update stats
+                    updateStats(data.stats);
+                    
+                    // Update pagination info
+                    if (data.pagination) {
+                        document.getElementById('total-logs').textContent = data.pagination.totalLogs;
+                        document.getElementById('stat-total').textContent = data.pagination.totalLogs;
+                    }
+
+                    // Show success indicator briefly
+                    refreshButton.innerHTML = '<svg class="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Updated';
+                    setTimeout(() => {
+                        refreshButton.innerHTML = originalContent;
+                        refreshButton.disabled = false;
+                    }, 1000);
+                } else {
+                    throw new Error(data.error || 'Failed to refresh logs');
+                }
+            } catch (error) {
+                console.error('Error refreshing logs:', error);
+                
+                // Show error indicator
+                const refreshButton = document.querySelector('button[onclick="refreshLogs()"]');
+                const originalContent = refreshButton.innerHTML;
+                refreshButton.innerHTML = '<svg class="w-4 h-4 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>Error';
+                refreshButton.disabled = false;
+                
+                setTimeout(() => {
+                    refreshButton.innerHTML = originalContent;
+                }, 2000);
+            }
+        }
+
+        function updateLogsTable(logs) {
+            const tbody = document.getElementById('logs-table');
+            tbody.innerHTML = '';
+
+            logs.forEach((log, index) => {
+                const row = document.createElement('tr');
+                row.className = 'log-row hover:bg-gray-50';
+                row.setAttribute('data-level', log.level);
+                row.setAttribute('data-type', log.type);
+                row.setAttribute('data-action', log.action);
+                row.setAttribute('data-log-id', log.id || index);
+                row.setAttribute('data-timestamp', log.timestamp);
+
+                // Format timestamp
+                let formattedTime;
+                try {
+                    if (log.formattedTime) {
+                        formattedTime = log.formattedTime;
+                    } else {
+                        const logDate = new Date(log.timestamp);
+                        if (isNaN(logDate.getTime())) {
+                            formattedTime = 'Invalid Time';
+                        } else {
+                            formattedTime = logDate.toLocaleString('id-ID', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false
+                            });
+                        }
+                    }
+                } catch (e) {
+                    formattedTime = 'Invalid Time';
+                }
+
+                // Level styling
+                let levelClass = 'bg-gray-100 text-gray-800';
+                let levelIcon = '';
+                if (log.level === 'info') {
+                    levelClass = 'bg-blue-100 text-blue-800';
+                    levelIcon = '🔵';
+                } else if (log.level === 'warning') {
+                    levelClass = 'bg-yellow-100 text-yellow-800';
+                    levelIcon = '⚠️';
+                } else if (log.level === 'error') {
+                    levelClass = 'bg-red-100 text-red-800';
+                    levelIcon = '🔴';
+                }
+
+                // Create detailed message
+                let detailedMessage = log.message;
+                if (log.action === 'Authentication') {
+                    detailedMessage = `🔐 ${log.message} - User authentication process completed`;
+                } else if (log.action === 'API Request') {
+                    detailedMessage = `🌐 ${log.message} - HTTP request processed by API server`;
+                } else if (log.action === 'Database') {
+                    detailedMessage = `🗄️ ${log.message} - Database operation executed`;
+                } else if (log.action === 'CloudPanel') {
+                    detailedMessage = `☁️ ${log.message} - CloudPanel management operation`;
+                } else if (log.action === 'Session') {
+                    detailedMessage = `👤 ${log.message} - User session management`;
+                } else if (log.action === 'Server Start') {
+                    detailedMessage = `🚀 ${log.message} - Server initialization and startup`;
+                } else if (log.action === 'Site Management') {
+                    detailedMessage = `🌍 ${log.message} - Website management operation`;
+                } else if (log.action === 'SSL Certificate') {
+                    detailedMessage = `🔒 ${log.message} - SSL certificate management`;
+                } else if (log.action === 'Error') {
+                    detailedMessage = `❌ ${log.message} - System error occurred`;
+                }
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${formattedTime}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${levelClass}">
+                            <span class="mr-1">${levelIcon}</span>
+                            ${log.level.toUpperCase()}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            ${log.action}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900 max-w-md">
+                        <div class="truncate" title="${log.message}">
+                            ${detailedMessage}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-50 text-gray-600">
+                            ${log.source}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="showLogDetail('${log.id || index}')" class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-md transition-colors duration-200 text-xs font-medium">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Detail
+                        </button>
+                    </td>
+                `;
+
+                // Add hidden data for modal
+                const scriptElement = document.createElement('script');
+                scriptElement.type = 'application/json';
+                scriptElement.id = `log-data-${log.id || index}`;
+                scriptElement.textContent = JSON.stringify({
+                    id: log.id || index,
+                    timestamp: log.timestamp,
+                    level: log.level,
+                    action: log.action,
+                    message: log.message,
+                    source: log.source,
+                    type: log.type,
+                    formattedTime: formattedTime,
+                    requestId: log.requestId || '',
+                    userId: log.userId || '',
+                    details: log.details || {},
+                    meta: log.meta || {},
+                    metadata: log.metadata || {
+                        service: 'cloudpanel-api',
+                        environment: 'production',
+                        version: '1.0.0',
+                        ip: '127.0.0.1'
+                    }
+                });
+
+                tbody.appendChild(row);
+                tbody.appendChild(scriptElement);
+            });
+        }
+
+        function updateStats(stats) {
+            if (stats) {
+                document.getElementById('stat-info').textContent = stats.info || 0;
+                document.getElementById('stat-warning').textContent = stats.warning || 0;
+                document.getElementById('stat-error').textContent = stats.error || 0;
+            }
         }
 
         async function testConnection() {
@@ -736,7 +954,7 @@
             isAutoRefresh = checkbox.checked;
             
             if (isAutoRefresh) {
-                autoRefreshInterval = setInterval(refreshLogs, 30000);
+                autoRefreshInterval = setInterval(refreshLogs, 2000);
             } else {
                 clearInterval(autoRefreshInterval);
             }

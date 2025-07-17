@@ -1683,26 +1683,90 @@ router.get("/setup-history", async (req, res) => {
       setupData.push(...updatedSetupData);
     }
 
-    // Add git status information for each setup that has a completed status
-    const setupDataWithGit = await Promise.all(setupData.map(async (setup) => {
-      if (setup.setup_status === 'completed') {
-        const site = sites.find(s => s.domain === setup.domain_name);
-        if (site) {
-          const sitePath = `/home/${site.user}/htdocs/${site.domain}`;
-          const gitStatus = await checkGitStatus(sitePath, site.user);
-          return {
-            ...setup,
-            gitStatus,
-            siteUser: site.user
-          };
-        }
+    // Synchronize setup data with sites data - add comprehensive site information
+    const setupDataWithSiteInfo = setupData.map((setup) => {
+      const site = sites.find(s => s.domain === setup.domain_name);
+      
+      if (site) {
+        // Site exists - add comprehensive site information
+        return {
+          ...setup,
+          siteUser: site.user,
+          siteType: site.type,
+          siteFramework: site.framework,
+          sitePath: site.path,
+          siteSSL: site.ssl,
+          siteCreated: site.created,
+          siteModified: site.modified,
+          siteSize: site.size,
+          siteExists: true,
+          // Keep the original site_user from database if it exists, otherwise use from sites
+          siteUserFromDB: setup.site_user || site.user
+        };
+      } else {
+        // Site doesn't exist in filesystem but has database record
+        return {
+          ...setup,
+          siteUser: setup.site_user || null, // Use database value if available
+          siteType: null,
+          siteFramework: null,
+          sitePath: null,
+          siteSSL: false,
+          siteCreated: null,
+          siteModified: null,
+          siteSize: 0,
+          siteExists: false,
+          siteUserFromDB: setup.site_user || null
+        };
       }
-      return {
-        ...setup,
-        gitStatus: 'not-available',
-        siteUser: null
-      };
+    });
+
+    // Also add sites that don't have setup records (new sites) - only Laravel sites
+    const sitesWithoutSetup = sites.filter(site => 
+      !setupData.some(setup => setup.domain_name === site.domain) &&
+      site.type === 'PHP' && site.framework === 'Laravel'
+    );
+
+    // Create setup-like records for sites without setup history (Laravel only)
+    const sitesAsSetupRecords = sitesWithoutSetup.map(site => ({
+      id: null, // No database ID since it's not in setup table
+      job_id: null,
+      domain_name: site.domain,
+      php_version: '8.3', // Default PHP version for Laravel
+      vhost_template: 'Laravel 12', // Default template for Laravel
+      site_user: site.user,
+      database_name: null,
+      database_user_name: null,
+      database_password: null,
+      repository_url: null,
+      run_migrations: false,
+      run_seeders: false,
+      optimize_cache: false,
+      install_composer: false,
+      site_created: true, // Site exists, so it was created
+      database_created: false,
+      ssh_keys_copied: false,
+      repository_cloned: false,
+      env_configured: false,
+      laravel_setup_completed: false,
+      setup_status: 'manual', // Indicate this was created manually, not through our setup process
+      error_message: null,
+      created_at: site.created,
+      // Additional site information
+      siteUser: site.user,
+      siteType: site.type,
+      siteFramework: site.framework,
+      sitePath: site.path,
+      siteSSL: site.ssl,
+      siteCreated: site.created,
+      siteModified: site.modified,
+      siteSize: site.size,
+      siteExists: true,
+      siteUserFromDB: site.user
     }));
+
+    // Combine setup records with sites that don't have setup records
+    const allSetupData = [...setupDataWithSiteInfo, ...sitesAsSetupRecords];
 
     // Helper function for formatting file size
     const formatFileSize = (bytes) => {
@@ -1715,7 +1779,7 @@ router.get("/setup-history", async (req, res) => {
 
     res.render("setup-history", {
       title: "Setup History",
-      setupData: setupDataWithGit,
+      setupData: allSetupData,
       user: req.session.user,
       baseUrl: `${req.protocol}://${req.get("host")}`,
       formatFileSize: formatFileSize,
@@ -1739,12 +1803,111 @@ router.get("/setup-history", async (req, res) => {
 // API endpoint to get setup history as JSON
 router.get("/api/setup-history", async (req, res) => {
   try {
+    // Get all setup records from database
     const setupData = await databaseService.getAllSetups();
+    
+    // Get all sites with timeout protection
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
+    });
+    const sites = await Promise.race([getSitesList(), timeoutPromise]);
+
+    // Synchronize setup data with sites data - add comprehensive site information
+    const setupDataWithSiteInfo = setupData.map((setup) => {
+      const site = sites.find(s => s.domain === setup.domain_name);
+      
+      if (site) {
+        // Site exists - add comprehensive site information
+        return {
+          ...setup,
+          siteUser: site.user,
+          siteType: site.type,
+          siteFramework: site.framework,
+          sitePath: site.path,
+          siteSSL: site.ssl,
+          siteCreated: site.created,
+          siteModified: site.modified,
+          siteSize: site.size,
+          siteExists: true,
+          // Keep the original site_user from database if it exists, otherwise use from sites
+          siteUserFromDB: setup.site_user || site.user
+        };
+      } else {
+        // Site doesn't exist in filesystem but has database record
+        return {
+          ...setup,
+          siteUser: setup.site_user || null, // Use database value if available
+          siteType: null,
+          siteFramework: null,
+          sitePath: null,
+          siteSSL: false,
+          siteCreated: null,
+          siteModified: null,
+          siteSize: 0,
+          siteExists: false,
+          siteUserFromDB: setup.site_user || null
+        };
+      }
+    });
+
+    // Also add sites that don't have setup records (new sites)
+    const sitesWithoutSetup = sites.filter(site => 
+      !setupData.some(setup => setup.domain_name === site.domain)
+    );
+
+    // Create setup-like records for sites without setup history
+    const sitesAsSetupRecords = sitesWithoutSetup.map(site => ({
+      id: null, // No database ID since it's not in setup table
+      job_id: null,
+      domain_name: site.domain,
+      php_version: null,
+      vhost_template: null,
+      site_user: site.user,
+      database_name: null,
+      database_user_name: null,
+      database_password: null,
+      repository_url: null,
+      run_migrations: false,
+      run_seeders: false,
+      optimize_cache: false,
+      install_composer: false,
+      site_created: true, // Site exists, so it was created
+      database_created: false,
+      ssh_keys_copied: false,
+      repository_cloned: false,
+      env_configured: false,
+      laravel_setup_completed: false,
+      setup_status: 'manual', // Indicate this was created manually, not through our setup process
+      error_message: null,
+      created_at: site.created,
+      // Additional site information
+      siteUser: site.user,
+      siteType: site.type,
+      siteFramework: site.framework,
+      sitePath: site.path,
+      siteSSL: site.ssl,
+      siteCreated: site.created,
+      siteModified: site.modified,
+      siteSize: site.size,
+      siteExists: true,
+      siteUserFromDB: site.user
+    }));
+
+    // Combine setup records with sites that don't have setup records
+    const allSetupData = [...setupDataWithSiteInfo, ...sitesAsSetupRecords];
+
     res.json({
       success: true,
       message: "Setup history retrieved successfully",
-      data: setupData,
-      total: setupData.length,
+      data: allSetupData,
+      total: allSetupData.length,
+      summary: {
+        totalSites: sites.length,
+        totalSetupRecords: setupData.length,
+        sitesWithSetup: setupDataWithSiteInfo.filter(s => s.siteExists).length,
+        sitesWithoutSetup: sitesWithoutSetup.length,
+        orphanedSetupRecords: setupDataWithSiteInfo.filter(s => !s.siteExists).length
+      }
     });
   } catch (error) {
     logger.error(`Error in API setup history: ${error.message}`);

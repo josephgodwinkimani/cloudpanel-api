@@ -65,6 +65,41 @@ router.get("/api", isAuthenticated, async (req, res) => {
   }
 });
 
+// API endpoint to get logs data with stats for client-side refresh
+router.get("/api/data", isAuthenticated, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const level = req.query.level || '';
+    const type = req.query.type || '';
+    const action = req.query.action || '';
+    const search = req.query.search || '';
+    
+    const logsData = await getLogs({ page, limit, level, type, action, search });
+    
+    // Calculate stats
+    const stats = {
+      info: logsData.logs.filter(log => log.level === 'info').length,
+      warning: logsData.logs.filter(log => log.level === 'warning').length,
+      error: logsData.logs.filter(log => log.level === 'error').length
+    };
+    
+    res.json({ 
+      success: true, 
+      logs: logsData.logs,
+      pagination: logsData.pagination,
+      stats: stats,
+      filters: { level, type, action, search }
+    });
+  } catch (error) {
+    // Skip frontend error logging
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to fetch logs" 
+    });
+  }
+});
+
 // API endpoint to test log files connection
 router.get("/api/test-connection", isAuthenticated, async (req, res) => {
   try {
@@ -360,7 +395,30 @@ async function getLogs(options = {}) {
               // Create a more reliable timestamp
               let logTimestamp;
               try {
-                logTimestamp = new Date(timestamp).toISOString();
+                // Try to parse the timestamp more robustly
+                let parsedTimestamp = timestamp.trim();
+                
+                // Handle different timestamp formats
+                if (parsedTimestamp.includes('T') && parsedTimestamp.includes('Z')) {
+                  // ISO format: 2024-01-15T10:30:45.123Z
+                  logTimestamp = new Date(parsedTimestamp).toISOString();
+                } else if (parsedTimestamp.includes('T') && !parsedTimestamp.includes('Z')) {
+                  // ISO format without Z: 2024-01-15T10:30:45.123
+                  logTimestamp = new Date(parsedTimestamp + 'Z').toISOString();
+                } else if (parsedTimestamp.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)) {
+                  // MySQL format: 2024-01-15 10:30:45
+                  logTimestamp = new Date(parsedTimestamp.replace(' ', 'T') + 'Z').toISOString();
+                } else if (parsedTimestamp.match(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/)) {
+                  // US format: 01/15/2024 10:30:45
+                  const [datePart, timePart] = parsedTimestamp.split(' ');
+                  const [month, day, year] = datePart.split('/');
+                  const newFormat = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart}Z`;
+                  logTimestamp = new Date(newFormat).toISOString();
+                } else {
+                  // Try direct parsing
+                  logTimestamp = new Date(parsedTimestamp).toISOString();
+                }
+                
                 // Validate the timestamp
                 if (isNaN(new Date(logTimestamp).getTime())) {
                   throw new Error('Invalid timestamp');
@@ -383,15 +441,25 @@ async function getLogs(options = {}) {
                 details: parsedDetails,
                 meta: parsedMeta,
                 priority: logFile.priority,
-                formattedTime: new Date(logTimestamp).toLocaleString('en-US', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                }),
+                formattedTime: (() => {
+                  try {
+                    const date = new Date(logTimestamp);
+                    if (isNaN(date.getTime())) {
+                      return 'Invalid Time';
+                    }
+                    return date.toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: false
+                    });
+                  } catch (e) {
+                    return 'Invalid Time';
+                  }
+                })(),
                 metadata: {
                   service: parsedMeta.service || 'cloudpanel-api',
                   environment: parsedMeta.environment || 'production',
@@ -422,7 +490,30 @@ async function getLogs(options = {}) {
                 // Create a more reliable timestamp
                 let logTimestamp;
                 try {
-                  logTimestamp = new Date(logEntry.timestamp || new Date()).toISOString();
+                  const timestamp = logEntry.timestamp || new Date();
+                  let parsedTimestamp = timestamp.toString().trim();
+                  
+                  // Handle different timestamp formats
+                  if (parsedTimestamp.includes('T') && parsedTimestamp.includes('Z')) {
+                    // ISO format: 2024-01-15T10:30:45.123Z
+                    logTimestamp = new Date(parsedTimestamp).toISOString();
+                  } else if (parsedTimestamp.includes('T') && !parsedTimestamp.includes('Z')) {
+                    // ISO format without Z: 2024-01-15T10:30:45.123
+                    logTimestamp = new Date(parsedTimestamp + 'Z').toISOString();
+                  } else if (parsedTimestamp.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)) {
+                    // MySQL format: 2024-01-15 10:30:45
+                    logTimestamp = new Date(parsedTimestamp.replace(' ', 'T') + 'Z').toISOString();
+                  } else if (parsedTimestamp.match(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/)) {
+                    // US format: 01/15/2024 10:30:45
+                    const [datePart, timePart] = parsedTimestamp.split(' ');
+                    const [month, day, year] = datePart.split('/');
+                    const newFormat = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart}Z`;
+                    logTimestamp = new Date(newFormat).toISOString();
+                  } else {
+                    // Try direct parsing
+                    logTimestamp = new Date(parsedTimestamp).toISOString();
+                  }
+                  
                   // Validate the timestamp
                   if (isNaN(new Date(logTimestamp).getTime())) {
                     throw new Error('Invalid timestamp');
@@ -443,15 +534,25 @@ async function getLogs(options = {}) {
                   details: logEntry.details || {},
                   meta: logEntry.meta || {},
                   priority: logFile.priority,
-                  formattedTime: new Date(logTimestamp).toLocaleString('en-US', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                  }),
+                  formattedTime: (() => {
+                    try {
+                      const date = new Date(logTimestamp);
+                      if (isNaN(date.getTime())) {
+                        return 'Invalid Time';
+                      }
+                      return date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                      });
+                    } catch (e) {
+                      return 'Invalid Time';
+                    }
+                  })(),
                   metadata: {
                     service: (logEntry.meta && logEntry.meta.service) || 'cloudpanel-api',
                     environment: (logEntry.meta && logEntry.meta.environment) || 'production',
@@ -485,15 +586,25 @@ async function getLogs(options = {}) {
                   type: logFile.type,
                   source: logFile.path.replace('logs/', '').replace('.log', ''),
                   priority: logFile.priority,
-                  formattedTime: new Date(logTimestamp).toLocaleString('en-US', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                  }),
+                  formattedTime: (() => {
+                    try {
+                      const date = new Date(logTimestamp);
+                      if (isNaN(date.getTime())) {
+                        return 'Invalid Time';
+                      }
+                      return date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                      });
+                    } catch (e) {
+                      return 'Invalid Time';
+                    }
+                  })(),
                   metadata: {
                     service: 'cloudpanel-api',
                     environment: 'production',
