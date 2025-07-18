@@ -2094,203 +2094,220 @@ router.delete("/api/setup-history/:id", requireAuth, async (req, res) => {
 });
 
 // Route to check cronjob permissions for a user
-router.post(
-  "/check-cronjob-permissions",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const { userName } = req.body;
-      
-      if (!userName) {
-        return res.status(400).json({
-          success: false,
-          message: "Username is required",
+router.post("/check-cronjob-permissions", requireAuth, async (req, res) => {
+  try {
+    const { userName } = req.body;
+
+    if (!userName) {
+      return res.status(400).json({
+        success: false,
+        message: "Username is required",
+      });
+    }
+
+    logger.info(`Checking cronjob permissions for user: ${userName}`);
+
+    // Execute crontab -e command for the user to check permissions
+    const command = `su - ${userName} -c 'crontab -l'`;
+
+    let result;
+    if (isDevelopment) {
+      const sshResult = await executeSshCommand(command);
+      logger.info(sshResult);
+      result = {
+        success: true,
+        hasPermission: true,
+        message: "User has cronjob permissions",
+        output: sshResult.output || "Permission check completed",
+      };
+    } else {
+      // Execute locally in production
+      const execAsync = promisify(exec);
+      try {
+        const { stdout, stderr } = await execAsync(command, {
+          timeout: 30000, // 30 second timeout
+          env: { ...process.env },
         });
-      }
-
-      logger.info(
-        `Checking cronjob permissions for user: ${userName}`
-      );
-
-      // Execute crontab -e command for the user to check permissions
-      const command = `su - ${userName} -c 'crontab -l'`;
-      
-      let result;
-      if (isDevelopment) {
-        const sshResult = await executeSshCommand(command);
         result = {
           success: true,
           hasPermission: true,
           message: "User has cronjob permissions",
-          output: sshResult.output || "Permission check completed"
+          output: stdout || "Permission check completed",
         };
-      } else {
-        // Execute locally in production
-        const execAsync = promisify(exec);
-        try {
-          const { stdout, stderr } = await execAsync(command, {
-            timeout: 30000, // 30 second timeout
-            env: { ...process.env }
-          });
-          
+      } catch (error) {
+        // Check if the error is "Operation not permitted"
+        if (error.stderr && error.stderr.includes("Operation not permitted")) {
+          result = {
+            success: true,
+            hasPermission: false,
+            message: "User does not have cronjob permissions",
+            error: "Operation not permitted",
+            stderr: error.stderr,
+          };
+        } else if (error.stderr && error.stderr.includes("no crontab for")) {
           result = {
             success: true,
             hasPermission: true,
             message: "User has cronjob permissions",
-            output: stdout || "Permission check completed"
+            error: "No crontab for",
+            stderr: error.stderr,
           };
-        } catch (error) {
-          // Check if the error is "Operation not permitted"
-          if (error.stderr && error.stderr.includes("Operation not permitted")) {
-            result = {
-              success: true,
-              hasPermission: false,
-              message: "User does not have cronjob permissions",
-              error: "Operation not permitted",
-              stderr: error.stderr
-            };
-          } else {
-            // Other errors
-            result = {
-              success: false,
-              hasPermission: false,
-              message: "Failed to check cronjob permissions",
-              error: error.message,
-              stderr: error.stderr
-            };
-          }
+        } else {
+          // Other errors
+          result = {
+            success: false,
+            hasPermission: false,
+            message: "Failed to check cronjob permissions",
+            error: error.message,
+            stderr: error.stderr,
+          };
         }
       }
+    }
 
-      res.json(result);
-    } catch (error) {
-      logger.error("Failed to check cronjob permissions:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to check cronjob permissions",
-        error: error.message
+    res.json(result);
+  } catch (error) {
+    logger.error("Failed to check cronjob permissions:", error);
+    if (error.stderr && error.stderr.includes("no crontab for")) {
+      return res.status(200).json({
+        success: true,
+        hasPermission: true,
+        message: "User has cronjob permissions",
       });
     }
+    res.status(500).json({
+      success: false,
+      message: "Failed to check cronjob permissions",
+      error: error.message,
+    });
   }
-);
+});
 
 // Route to grant cronjob permissions for a user
-router.post(
-  "/grant-cronjob-permissions",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const { userName } = req.body;
-      
-      if (!userName) {
-        return res.status(400).json({
-          success: false,
-          message: "Username is required",
-        });
-      }
+router.post("/grant-cronjob-permissions", requireAuth, async (req, res) => {
+  try {
+    const { userName } = req.body;
 
-      logger.info(
-        `Granting cronjob permissions for user: ${userName}`
-      );
-
-      // Commands to grant cronjob permissions
-      // First, ensure the crontab file exists and has correct ownership
-      // chown u295s18019:crontab /var/spool/cron/crontabs/u295s18019
-      // chmod 600 /var/spool/cron/crontabs/u295s18019
-      
-      const touchCommand = `touch /var/spool/cron/crontabs/${userName}`;
-      const chownCommand = `chown ${userName}:crontab /var/spool/cron/crontabs/${userName}`;
-      const chmodCommand = `chmod 600 /var/spool/cron/crontabs/${userName}`;
-      
-      // Alternative approach: add user to crontab group if it exists
-      const usermodCommand = `usermod -a -G crontab ${userName}`;
-      
-      let result;
-      if (isDevelopment) {
-        // Execute commands via SSH
-        try {
-          const touchResult = await executeSshCommand(touchCommand);
-          const chownResult = await executeSshCommand(chownCommand);
-          const chmodResult = await executeSshCommand(chmodCommand);
-          
-          let usermodResult = null;
-          
-          result = {
-            success: true,
-            hasPermission: true,
-            message: "Cronjob permissions granted successfully",
-            output: `touch: ${touchResult.output || 'OK'}, chown: ${chownResult.output || 'OK'}, chmod: ${chmodResult.output || 'OK'}${usermodResult ? `, usermod: ${usermodResult.output || 'OK'}` : ', usermod: skipped (group not found)'}`
-          };
-        } catch (error) {
-          result = {
-            success: false,
-            hasPermission: false,
-            message: "Failed to grant cronjob permissions",
-            error: error.message || error
-          };
-        }
-      } else {
-        // Execute locally in production
-        const execAsync = promisify(exec);
-        try {
-          // Execute touch command to ensure file exists
-          const touchResult = await execAsync(touchCommand, {
-            timeout: 30000,
-            env: { ...process.env }
-          });
-          
-          // Execute chown command
-          const chownResult = await execAsync(chownCommand, {
-            timeout: 30000,
-            env: { ...process.env }
-          });
-          
-          // Execute chmod command
-          const chmodResult = await execAsync(chmodCommand, {
-            timeout: 30000,
-            env: { ...process.env }
-          });
-          
-          // Try to add user to crontab group (this might fail if group doesn't exist, which is OK)
-          let usermodResult = null;
-          try {
-            usermodResult = await execAsync(usermodCommand, {
-              timeout: 30000,
-              env: { ...process.env }
-            });
-          } catch (usermodError) {
-            // Ignore usermod errors - group might not exist
-            logger.info(`usermod command failed (this is normal if crontab group doesn't exist): ${usermodError.message}`);
-          }
-          
-          result = {
-            success: true,
-            hasPermission: true,
-            message: "Cronjob permissions granted successfully",
-            output: `touch: ${touchResult.stdout || 'OK'}, chown: ${chownResult.stdout || 'OK'}, chmod: ${chmodResult.stdout || 'OK'}${usermodResult ? `, usermod: ${usermodResult.stdout || 'OK'}` : ', usermod: skipped (group not found)'}`
-          };
-        } catch (error) {
-          result = {
-            success: false,
-            hasPermission: false,
-            message: "Failed to grant cronjob permissions",
-            error: error.message,
-            stderr: error.stderr
-          };
-        }
-      }
-
-      res.json(result);
-    } catch (error) {
-      logger.error("Failed to grant cronjob permissions:", error);
-      res.status(500).json({
+    if (!userName) {
+      return res.status(400).json({
         success: false,
-        message: "Failed to grant cronjob permissions",
-        error: error.message
+        message: "Username is required",
       });
     }
+
+    logger.info(`Granting cronjob permissions for user: ${userName}`);
+
+    // Commands to grant cronjob permissions
+    // First, ensure the crontab file exists and has correct ownership
+    // chown u295s18019:crontab /var/spool/cron/crontabs/u295s18019
+    // chmod 600 /var/spool/cron/crontabs/u295s18019
+
+    const touchCommand = `touch /var/spool/cron/crontabs/${userName}`;
+    const chownCommand = `chown ${userName}:crontab /var/spool/cron/crontabs/${userName}`;
+    const chmodCommand = `chmod 600 /var/spool/cron/crontabs/${userName}`;
+
+    // Alternative approach: add user to crontab group if it exists
+    const usermodCommand = `usermod -a -G crontab ${userName}`;
+
+    let result;
+    if (isDevelopment) {
+      // Execute commands via SSH
+      try {
+        const touchResult = await executeSshCommand(touchCommand);
+        const chownResult = await executeSshCommand(chownCommand);
+        const chmodResult = await executeSshCommand(chmodCommand);
+
+        let usermodResult = null;
+
+        result = {
+          success: true,
+          hasPermission: true,
+          message: "Cronjob permissions granted successfully",
+          output: `touch: ${touchResult.output || "OK"}, chown: ${
+            chownResult.output || "OK"
+          }, chmod: ${chmodResult.output || "OK"}${
+            usermodResult
+              ? `, usermod: ${usermodResult.output || "OK"}`
+              : ", usermod: skipped (group not found)"
+          }`,
+        };
+      } catch (error) {
+        result = {
+          success: false,
+          hasPermission: false,
+          message: "Failed to grant cronjob permissions",
+          error: error.message || error,
+        };
+      }
+    } else {
+      // Execute locally in production
+      const execAsync = promisify(exec);
+      try {
+        // Execute touch command to ensure file exists
+        const touchResult = await execAsync(touchCommand, {
+          timeout: 30000,
+          env: { ...process.env },
+        });
+
+        // Execute chown command
+        const chownResult = await execAsync(chownCommand, {
+          timeout: 30000,
+          env: { ...process.env },
+        });
+
+        // Execute chmod command
+        const chmodResult = await execAsync(chmodCommand, {
+          timeout: 30000,
+          env: { ...process.env },
+        });
+
+        // Try to add user to crontab group (this might fail if group doesn't exist, which is OK)
+        let usermodResult = null;
+        try {
+          usermodResult = await execAsync(usermodCommand, {
+            timeout: 30000,
+            env: { ...process.env },
+          });
+        } catch (usermodError) {
+          // Ignore usermod errors - group might not exist
+          logger.info(
+            `usermod command failed (this is normal if crontab group doesn't exist): ${usermodError.message}`
+          );
+        }
+
+        result = {
+          success: true,
+          hasPermission: true,
+          message: "Cronjob permissions granted successfully",
+          output: `touch: ${touchResult.stdout || "OK"}, chown: ${
+            chownResult.stdout || "OK"
+          }, chmod: ${chmodResult.stdout || "OK"}${
+            usermodResult
+              ? `, usermod: ${usermodResult.stdout || "OK"}`
+              : ", usermod: skipped (group not found)"
+          }`,
+        };
+      } catch (error) {
+        result = {
+          success: false,
+          hasPermission: false,
+          message: "Failed to grant cronjob permissions",
+          error: error.message,
+          stderr: error.stderr,
+        };
+      }
+    }
+
+    res.json(result);
+  } catch (error) {
+    logger.error("Failed to grant cronjob permissions:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to grant cronjob permissions",
+      error: error.message,
+    });
   }
-);
+});
 
 // Route to perform git pull for a specific site (background processing)
 router.post(
@@ -2458,5 +2475,401 @@ router.post("/batch-git-pull", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Failed to queue batch git pull jobs" });
   }
 });
+
+// Route to check and fix crontab permissions for all users in batch
+router.post(
+  "/batch-check-cronjob-permissions",
+  requireAuth,
+  async (req, res) => {
+    try {
+      logger.info(
+        "Starting batch crontab permission check and fix for all users"
+      );
+
+      // Get all unique users from sites filesystem only (not from database)
+      let allUsers = [];
+      try {
+        let sites = await getSitesList();
+        sites = sites.filter((site) => site.framework === "Laravel");
+        const uniqueUsers = new Set();
+
+        sites.forEach((site) => {
+          if (site.user) {
+            uniqueUsers.add(site.user);
+          }
+        });
+
+        allUsers = Array.from(uniqueUsers);
+        logger.info(
+          `Found ${allUsers.length} unique users from sites filesystem for batch crontab permission check`
+        );
+      } catch (sitesError) {
+        logger.warn(`Failed to get users from sites: ${sitesError.message}`);
+        // Continue with empty user list
+      }
+
+      if (allUsers.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No users found for batch crontab permission check",
+          data: {
+            totalUsers: 0,
+            processedUsers: 0,
+            successfulChecks: 0,
+            failedChecks: 0,
+            usersWithPermissions: 0,
+            usersWithoutPermissions: 0,
+            usersFixed: 0,
+            results: [],
+          },
+        });
+      }
+
+      const results = [];
+      let successfulChecks = 0;
+      let failedChecks = 0;
+      let usersWithPermissions = 0;
+      let usersWithoutPermissions = 0;
+      let usersFixed = 0;
+
+      // Process each user
+      for (const userName of allUsers) {
+        try {
+          logger.info(`Processing crontab permissions for user: ${userName}`);
+
+          // Step 1: Check current permissions
+          const checkCommand = `su - ${userName} -c 'crontab -l'`;
+          let checkResult;
+
+          if (isDevelopment) {
+            try {
+              const sshResult = await executeSshCommand(checkCommand);
+              checkResult = {
+                success: true,
+                hasPermission: true,
+                message: "User has cronjob permissions",
+                output: sshResult.output || "Permission check completed",
+              };
+            } catch (sshError) {
+              // Check if the error is "Operation not permitted"
+              if (
+                sshError.stderr &&
+                sshError.stderr.includes("Operation not permitted")
+              ) {
+                logger.error(`Operation not permitted for user: ${userName}`);
+                checkResult = {
+                  success: true,
+                  hasPermission: false,
+                  message: "User does not have cronjob permissions",
+                  error: "Operation not permitted",
+                  stderr: sshError.stderr,
+                };
+              } else if (
+                sshError.stderr &&
+                sshError.stderr.includes("no crontab for")
+              ) {
+                checkResult = {
+                  success: true,
+                  hasPermission: true,
+                  message: "User has cronjob permissions",
+                  error: "No crontab for",
+                  stderr: sshError.stderr,
+                };
+              } else {
+                checkResult = {
+                  success: false,
+                  hasPermission: false,
+                  message: "Failed to check cronjob permissions",
+                  error: sshError.message,
+                  stderr: sshError.stderr,
+                };
+              }
+            }
+          } else {
+            // Execute locally in production
+            const execAsync = promisify(exec);
+            try {
+              const { stdout, stderr } = await execAsync(checkCommand, {
+                timeout: 30000,
+                env: { ...process.env },
+              });
+
+              checkResult = {
+                success: true,
+                hasPermission: true,
+                message: "User has cronjob permissions",
+                output: stdout || "Permission check completed",
+              };
+            } catch (error) {
+              // Check if the error is "Operation not permitted"
+              if (
+                error.stderr &&
+                error.stderr.includes("Operation not permitted")
+              ) {
+                checkResult = {
+                  success: true,
+                  hasPermission: false,
+                  message: "User does not have cronjob permissions",
+                  error: "Operation not permitted",
+                  stderr: error.stderr,
+                };
+              } else if (
+                error.stderr &&
+                error.stderr.includes("no crontab for")
+              ) {
+                checkResult = {
+                  success: true,
+                  hasPermission: true,
+                  message: "User has cronjob permissions",
+                  error: "No crontab for",
+                  stderr: error.stderr,
+                };
+              } else {
+                checkResult = {
+                  success: false,
+                  hasPermission: false,
+                  message: "Failed to check cronjob permissions",
+                  error: error.message,
+                  stderr: error.stderr,
+                };
+              }
+            }
+          }
+
+          // Step 2: If user doesn't have permissions, try to fix them
+          let fixResult = null;
+          if (checkResult.success && !checkResult.hasPermission) {
+            logger.info(
+              `Attempting to fix crontab permissions for user: ${userName}`
+            );
+
+            // Commands to grant cronjob permissions
+            const touchCommand = `touch /var/spool/cron/crontabs/${userName}`;
+            const chownCommand = `chown ${userName}:crontab /var/spool/cron/crontabs/${userName}`;
+            const chmodCommand = `chmod 600 /var/spool/cron/crontabs/${userName}`;
+            // const usermodCommand = `usermod -a -G crontab ${userName}`;
+
+            try {
+              if (isDevelopment) {
+                // Execute commands via SSH
+                const touchResult = await executeSshCommand(touchCommand);
+                const chownResult = await executeSshCommand(chownCommand);
+                const chmodResult = await executeSshCommand(chmodCommand);
+
+                let usermodResult = null;
+                // try {
+                //   usermodResult = await executeSshCommand(usermodCommand);
+                // } catch (usermodError) {
+                //   // Ignore usermod errors - group might not exist
+                //   logger.info(`usermod command failed for ${userName} (this is normal if crontab group doesn't exist): ${usermodError.message}`);
+                // }
+
+                fixResult = {
+                  success: true,
+                  message: "Cronjob permissions granted successfully",
+                  output: `touch: ${touchResult.output || "OK"}, chown: ${
+                    chownResult.output || "OK"
+                  }, chmod: ${chmodResult.output || "OK"}${
+                    usermodResult
+                      ? `, usermod: ${usermodResult.output || "OK"}`
+                      : ", usermod: skipped (group not found)"
+                  }`,
+                };
+              } else {
+                // Execute locally in production
+                const execAsync = promisify(exec);
+
+                // Execute touch command to ensure file exists
+                const touchResult = await execAsync(touchCommand, {
+                  timeout: 30000,
+                  env: { ...process.env },
+                });
+
+                // Execute chown command
+                const chownResult = await execAsync(chownCommand, {
+                  timeout: 30000,
+                  env: { ...process.env },
+                });
+
+                // Execute chmod command
+                const chmodResult = await execAsync(chmodCommand, {
+                  timeout: 30000,
+                  env: { ...process.env },
+                });
+
+                // Try to add user to crontab group (this might fail if group doesn't exist, which is OK)
+                let usermodResult = null;
+                try {
+                  usermodResult = await execAsync(usermodCommand, {
+                    timeout: 30000,
+                    env: { ...process.env },
+                  });
+                } catch (usermodError) {
+                  // Ignore usermod errors - group might not exist
+                  logger.info(
+                    `usermod command failed for ${userName} (this is normal if crontab group doesn't exist): ${usermodError.message}`
+                  );
+                }
+
+                fixResult = {
+                  success: true,
+                  message: "Cronjob permissions granted successfully",
+                  output: `touch: ${touchResult.stdout || "OK"}, chown: ${
+                    chownResult.stdout || "OK"
+                  }, chmod: ${chmodResult.stdout || "OK"}${
+                    usermodResult
+                      ? `, usermod: ${usermodResult.stdout || "OK"}`
+                      : ", usermod: skipped (group not found)"
+                  }`,
+                };
+              }
+
+              usersFixed++;
+              logger.success(
+                `Successfully fixed crontab permissions for user: ${userName}`
+              );
+            } catch (fixError) {
+              fixResult = {
+                success: false,
+                message: "Failed to grant cronjob permissions",
+                error: fixError.message || fixError,
+                stderr: fixError.stderr,
+              };
+              logger.error(
+                `Failed to fix crontab permissions for user ${userName}: ${fixError.message}`
+              );
+            }
+          }
+
+          // Step 3: Verify permissions after fix (if fix was attempted)
+          let finalCheckResult = null;
+          if (fixResult && fixResult.success) {
+            logger.info(
+              `Verifying crontab permissions for user after fix: ${userName}`
+            );
+
+            // Wait a moment for changes to take effect
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            const verifyCommand = `su - ${userName} -c 'crontab -l'`;
+
+            try {
+              if (isDevelopment) {
+                const sshResult = await executeSshCommand(verifyCommand);
+                finalCheckResult = {
+                  success: true,
+                  hasPermission: true,
+                  message:
+                    "User now has cronjob permissions (verified after fix)",
+                  output:
+                    sshResult.output || "Permission verification completed",
+                };
+              } else {
+                const execAsync = promisify(exec);
+                const { stdout, stderr } = await execAsync(verifyCommand, {
+                  timeout: 30000,
+                  env: { ...process.env },
+                });
+
+                finalCheckResult = {
+                  success: true,
+                  hasPermission: true,
+                  message:
+                    "User now has cronjob permissions (verified after fix)",
+                  output: stdout || "Permission verification completed",
+                };
+              }
+            } catch (verifyError) {
+              finalCheckResult = {
+                success: false,
+                hasPermission: false,
+                message:
+                  "User still does not have cronjob permissions after fix attempt",
+                error: verifyError.message,
+                stderr: verifyError.stderr,
+              };
+            }
+          }
+
+          // Compile result for this user
+          const userResult = {
+            userName,
+            initialCheck: checkResult,
+            fixAttempt: fixResult,
+            finalCheck: finalCheckResult,
+            status: checkResult.success
+              ? checkResult.hasPermission
+                ? "has_permissions"
+                : fixResult && fixResult.success
+                ? "fixed"
+                : "failed_to_fix"
+              : "check_failed",
+          };
+
+          results.push(userResult);
+          successfulChecks++;
+
+          if (checkResult.hasPermission) {
+            usersWithPermissions++;
+          } else {
+            usersWithoutPermissions++;
+          }
+
+          logger.info(
+            `Completed processing for user ${userName}: ${userResult.status}`
+          );
+        } catch (userError) {
+          logger.error(
+            `Error processing user ${userName}: ${userError.message}`
+          );
+          failedChecks++;
+
+          results.push({
+            userName,
+            error: userError.message,
+            status: "error",
+          });
+        }
+      }
+
+      // Prepare summary
+      const summary = {
+        totalUsers: allUsers.length,
+        processedUsers: results.length,
+        successfulChecks,
+        failedChecks,
+        usersWithPermissions,
+        usersWithoutPermissions,
+        usersFixed,
+        successRate:
+          allUsers.length > 0
+            ? ((successfulChecks / allUsers.length) * 100).toFixed(1)
+            : 0,
+      };
+
+      logger.success(
+        `Batch crontab permission check completed. Summary: ${JSON.stringify(
+          summary
+        )}`
+      );
+
+      res.json({
+        success: true,
+        message: `Batch crontab permission check completed for ${allUsers.length} users`,
+        data: {
+          ...summary,
+          results,
+        },
+      });
+    } catch (error) {
+      logger.error("Failed to perform batch crontab permission check:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to perform batch crontab permission check",
+        error: error.message,
+      });
+    }
+  }
+);
 
 module.exports = router;
