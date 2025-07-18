@@ -1645,7 +1645,7 @@ router.get("/setup-history", async (req, res) => {
   try {
     // Get all setup records from database
     const setupData = await databaseService.getAllSetups();
-    
+
     // Get all sites with timeout protection
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
@@ -1653,30 +1653,40 @@ router.get("/setup-history", async (req, res) => {
     const sites = await Promise.race([getSitesList(), timeoutPromise]);
 
     // Create sets for efficient lookup
-    const sitesDomains = new Set(sites.map(site => site.domain));
-    const dbDomains = new Set(setupData.map(setup => setup.domain_name));
+    const sitesDomains = new Set(sites.map((site) => site.domain));
+    const dbDomains = new Set(setupData.map((setup) => setup.domain_name));
 
     // Find domains that exist in database but not in sites
-    const domainsToDelete = [...dbDomains].filter(domain => !sitesDomains.has(domain));
+    const domainsToDelete = [...dbDomains].filter(
+      (domain) => !sitesDomains.has(domain)
+    );
 
     // Delete records for non-existent domains
     if (domainsToDelete.length > 0) {
-      logger.info(`Found ${domainsToDelete.length} database records to delete for non-existent domains`);
-      
+      logger.info(
+        `Found ${domainsToDelete.length} database records to delete for non-existent domains`
+      );
+
       for (const domain of domainsToDelete) {
         // Find all setup records for this domain
-        const recordsToDelete = setupData.filter(setup => setup.domain_name === domain);
-        
+        const recordsToDelete = setupData.filter(
+          (setup) => setup.domain_name === domain
+        );
+
         for (const record of recordsToDelete) {
           try {
             await databaseService.deleteSetup(record.id);
-            logger.success(`Deleted setup record ID ${record.id} for non-existent domain: ${domain}`);
+            logger.success(
+              `Deleted setup record ID ${record.id} for non-existent domain: ${domain}`
+            );
           } catch (deleteError) {
-            logger.error(`Failed to delete setup record ID ${record.id} for domain ${domain}: ${deleteError.message}`);
+            logger.error(
+              `Failed to delete setup record ID ${record.id} for domain ${domain}: ${deleteError.message}`
+            );
           }
         }
       }
-      
+
       // Refresh setup data after deletions
       const updatedSetupData = await databaseService.getAllSetups();
       setupData.length = 0;
@@ -1685,8 +1695,8 @@ router.get("/setup-history", async (req, res) => {
 
     // Synchronize setup data with sites data - add comprehensive site information
     const setupDataWithSiteInfo = setupData.map((setup) => {
-      const site = sites.find(s => s.domain === setup.domain_name);
-      
+      const site = sites.find((s) => s.domain === setup.domain_name);
+
       if (site) {
         // Site exists - add comprehensive site information
         return {
@@ -1701,7 +1711,7 @@ router.get("/setup-history", async (req, res) => {
           siteSize: site.size,
           siteExists: true,
           // Keep the original site_user from database if it exists, otherwise use from sites
-          siteUserFromDB: setup.site_user || site.user
+          siteUserFromDB: setup.site_user || site.user,
         };
       } else {
         // Site doesn't exist in filesystem but has database record
@@ -1716,24 +1726,26 @@ router.get("/setup-history", async (req, res) => {
           siteModified: null,
           siteSize: 0,
           siteExists: false,
-          siteUserFromDB: setup.site_user || null
+          siteUserFromDB: setup.site_user || null,
         };
       }
     });
 
     // Also add sites that don't have setup records (new sites) - only Laravel sites
-    const sitesWithoutSetup = sites.filter(site => 
-      !setupData.some(setup => setup.domain_name === site.domain) &&
-      site.type === 'PHP' && site.framework === 'Laravel'
+    const sitesWithoutSetup = sites.filter(
+      (site) =>
+        !setupData.some((setup) => setup.domain_name === site.domain) &&
+        site.type === "PHP" &&
+        site.framework === "Laravel"
     );
 
     // Create setup-like records for sites without setup history (Laravel only)
-    const sitesAsSetupRecords = sitesWithoutSetup.map(site => ({
+    const sitesAsSetupRecords = sitesWithoutSetup.map((site) => ({
       id: null, // No database ID since it's not in setup table
       job_id: null,
       domain_name: site.domain,
-      php_version: '8.3', // Default PHP version for Laravel
-      vhost_template: 'Laravel 12', // Default template for Laravel
+      php_version: "8.3", // Default PHP version for Laravel
+      vhost_template: "Laravel 12", // Default template for Laravel
       site_user: site.user,
       database_name: null,
       database_user_name: null,
@@ -1749,7 +1761,7 @@ router.get("/setup-history", async (req, res) => {
       repository_cloned: false,
       env_configured: false,
       laravel_setup_completed: false,
-      setup_status: 'manual', // Indicate this was created manually, not through our setup process
+      setup_status: "manual", // Indicate this was created manually, not through our setup process
       error_message: null,
       created_at: site.created,
       // Additional site information
@@ -1762,7 +1774,7 @@ router.get("/setup-history", async (req, res) => {
       siteModified: site.modified,
       siteSize: site.size,
       siteExists: true,
-      siteUserFromDB: site.user
+      siteUserFromDB: site.user,
     }));
 
     // Combine setup records with sites that don't have setup records
@@ -1805,7 +1817,7 @@ router.get("/api/setup-history", async (req, res) => {
   try {
     // Get all setup records from database
     const setupData = await databaseService.getAllSetups();
-    
+
     // Get all sites with timeout protection
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
@@ -1814,8 +1826,8 @@ router.get("/api/setup-history", async (req, res) => {
 
     // Synchronize setup data with sites data - add comprehensive site information
     const setupDataWithSiteInfo = setupData.map((setup) => {
-      const site = sites.find(s => s.domain === setup.domain_name);
-      
+      const site = sites.find((s) => s.domain === setup.domain_name);
+
       if (site) {
         // Site exists - add comprehensive site information
         return {
@@ -1830,7 +1842,7 @@ router.get("/api/setup-history", async (req, res) => {
           siteSize: site.size,
           siteExists: true,
           // Keep the original site_user from database if it exists, otherwise use from sites
-          siteUserFromDB: setup.site_user || site.user
+          siteUserFromDB: setup.site_user || site.user,
         };
       } else {
         // Site doesn't exist in filesystem but has database record
@@ -1845,18 +1857,18 @@ router.get("/api/setup-history", async (req, res) => {
           siteModified: null,
           siteSize: 0,
           siteExists: false,
-          siteUserFromDB: setup.site_user || null
+          siteUserFromDB: setup.site_user || null,
         };
       }
     });
 
     // Also add sites that don't have setup records (new sites)
-    const sitesWithoutSetup = sites.filter(site => 
-      !setupData.some(setup => setup.domain_name === site.domain)
+    const sitesWithoutSetup = sites.filter(
+      (site) => !setupData.some((setup) => setup.domain_name === site.domain)
     );
 
     // Create setup-like records for sites without setup history
-    const sitesAsSetupRecords = sitesWithoutSetup.map(site => ({
+    const sitesAsSetupRecords = sitesWithoutSetup.map((site) => ({
       id: null, // No database ID since it's not in setup table
       job_id: null,
       domain_name: site.domain,
@@ -1877,7 +1889,7 @@ router.get("/api/setup-history", async (req, res) => {
       repository_cloned: false,
       env_configured: false,
       laravel_setup_completed: false,
-      setup_status: 'manual', // Indicate this was created manually, not through our setup process
+      setup_status: "manual", // Indicate this was created manually, not through our setup process
       error_message: null,
       created_at: site.created,
       // Additional site information
@@ -1890,7 +1902,7 @@ router.get("/api/setup-history", async (req, res) => {
       siteModified: site.modified,
       siteSize: site.size,
       siteExists: true,
-      siteUserFromDB: site.user
+      siteUserFromDB: site.user,
     }));
 
     // Combine setup records with sites that don't have setup records
@@ -1904,10 +1916,12 @@ router.get("/api/setup-history", async (req, res) => {
       summary: {
         totalSites: sites.length,
         totalSetupRecords: setupData.length,
-        sitesWithSetup: setupDataWithSiteInfo.filter(s => s.siteExists).length,
+        sitesWithSetup: setupDataWithSiteInfo.filter((s) => s.siteExists)
+          .length,
         sitesWithoutSetup: sitesWithoutSetup.length,
-        orphanedSetupRecords: setupDataWithSiteInfo.filter(s => !s.siteExists).length
-      }
+        orphanedSetupRecords: setupDataWithSiteInfo.filter((s) => !s.siteExists)
+          .length,
+      },
     });
   } catch (error) {
     logger.error(`Error in API setup history: ${error.message}`);
