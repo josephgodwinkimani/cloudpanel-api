@@ -3017,22 +3017,18 @@
           button.disabled = true;
           buttonText.textContent = 'Processing...';
 
-          // Get all completed setup rows
-          const completedRows = Array.from(document.querySelectorAll('tr[data-setup-id]'))
+          // Get all setup rows regardless of status
+          const allRows = Array.from(document.querySelectorAll('tr[data-setup-id]'))
             .map(row => {
-              const statusCell = row.querySelector('td:nth-child(2)');
-              if (statusCell && statusCell.textContent.trim().toLowerCase().includes('completed')) {
-                const setupId = row.dataset.setupId;
-                const domain = row.querySelector('td:first-child .text-sm.font-medium.text-gray-900').textContent.trim();
-                const siteUser = row.querySelector('td:nth-child(5)').textContent.trim();
-                return { setupId, domain, siteUser };
-              }
-              return null;
+              const setupId = row.dataset.setupId;
+              const domain = row.querySelector('td:first-child .text-sm.font-medium.text-gray-900').textContent.trim();
+              const siteUser = row.querySelector('td:nth-child(5)').textContent.trim();
+              return { setupId, domain, siteUser };
             })
             .filter(Boolean);
 
-          if (completedRows.length === 0) {
-            showNotification('No completed sites found for git pull', 'warning');
+          if (allRows.length === 0) {
+            showNotification('No sites found for git pull', 'warning');
             return;
           }
 
@@ -3042,7 +3038,7 @@
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ sites: completedRows })
+            body: JSON.stringify({ sites: allRows })
           });
 
           if (!response.ok) {
