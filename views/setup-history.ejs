@@ -3022,7 +3022,7 @@
             .map(row => {
               const setupId = row.dataset.setupId;
               const domain = row.querySelector('td:first-child .text-sm.font-medium.text-gray-900').textContent.trim();
-              const siteUser = row.querySelector('td:nth-child(5)').textContent.trim();
+              const siteUser = row.querySelector('td:nth-child(6) .text-sm.font-medium.text-gray-900').textContent.trim();
               return { setupId, domain, siteUser };
             })
             .filter(Boolean);
