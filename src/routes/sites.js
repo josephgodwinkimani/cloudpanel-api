@@ -354,8 +354,14 @@ async function pathExists(filePath) {
   }
 }
 
-// Middleware to require authentication for all routes
-router.use(requireAuth);
+// Middleware to require authentication for all routes except API endpoints
+router.use((req, res, next) => {
+  // Skip authentication for API endpoints
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+  return requireAuth(req, res, next);
+});
 
 // Get all sites from /home directory structure (optimized for SSH)
 async function getSitesList() {
@@ -833,6 +839,42 @@ async function getDomainInfo(domainPath, domainName, userName) {
     // Get standardized framework information
     const frameworkInfo = getFrameworkInfo(siteType);
 
+    // Extract values from .env file and other configuration files
+    const databaseName =
+      (await extractEnvValue(domainPath, "DB_DATABASE")) ||
+      (await extractEnvValue(domainPath, "DATABASE_NAME")) ||
+      (await extractEnvValue(domainPath, "DB_NAME")) ||
+      (await extractEnvValue(domainPath, "database"));
+    const databaseUser =
+      (await extractEnvValue(domainPath, "DB_USERNAME")) ||
+      (await extractEnvValue(domainPath, "DATABASE_USER")) ||
+      (await extractEnvValue(domainPath, "DB_USER")) ||
+      (await extractEnvValue(domainPath, "username"));
+    const databasePassword =
+      (await extractEnvValue(domainPath, "DB_PASSWORD")) ||
+      (await extractEnvValue(domainPath, "DATABASE_PASSWORD")) ||
+      (await extractEnvValue(domainPath, "DB_PASS")) ||
+      (await extractEnvValue(domainPath, "password"));
+    const appKey =
+      (await extractEnvValue(domainPath, "APP_KEY")) ||
+      (await extractEnvValue(domainPath, "APP_SECRET")) ||
+      (await extractEnvValue(domainPath, "SECRET_KEY")) ||
+      (await extractEnvValue(domainPath, "AUTH_KEY")) ||
+      (await extractEnvValue(domainPath, "SECURE_AUTH_KEY"));
+
+    // Debug logging for environment variables
+    logger.debug(`Domain ${domainName} env extraction:`, {
+      database: databaseName,
+      database_user: databaseUser,
+      database_password: databasePassword ? "***HIDDEN***" : null,
+      app_key: appKey ? "***HIDDEN***" : null,
+      path: domainPath
+    });
+
+    // Get backup information
+    const databaseBackup = await getDatabaseBackupInfo(userName);
+    const siteBackup = await getSiteBackupInfo(userName);
+
     return {
       domain: domainName,
       user: userName,
@@ -840,9 +882,15 @@ async function getDomainInfo(domainPath, domainName, userName) {
       framework: frameworkInfo.framework,
       ssl: hasSSL,
       path: domainPath,
+      database: databaseName,
+      database_user: databaseUser,
+      database_password: databasePassword,
+      app_key: appKey,
       created: stats.birthtime,
       modified: stats.mtime,
       size: await getDirSize(domainPath),
+      database_backup: databaseBackup,
+      site_backup: siteBackup,
     };
   } catch (error) {
     logger.warn(
@@ -855,9 +903,15 @@ async function getDomainInfo(domainPath, domainName, userName) {
       framework: null,
       ssl: false,
       path: domainPath,
+      database: null,
+      database_user: null,
+      database_password: null,
+      app_key: null,
       created: new Date(),
       modified: new Date(),
       size: 0,
+      database_backup: null,
+      site_backup: null,
     };
   }
 }
@@ -1424,21 +1478,27 @@ router.get("/", async (req, res) => {
   }
 });
 
-// API endpoint to get sites data as JSON
+// API endpoint to get sites data as JSON with pagination
 router.get("/api/list", async (req, res) => {
   try {
+    // Extract pagination parameters from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const sortBy = req.query.sortBy || 'domain';
+    const sortOrder = req.query.sortOrder || 'asc';
+
     // Add timeout to prevent hanging
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
     });
 
-    const sites = await Promise.race([getSitesList(), timeoutPromise]);
+    const result = await Promise.race([getSitesListAll(page, limit, sortBy, sortOrder), timeoutPromise]);
 
     res.json({
       success: true,
       message: "Sites retrieved successfully",
-      data: sites,
-      total: sites.length,
+      data: result.sites,
+      pagination: result.pagination,
     });
   } catch (error) {
     logger.error(`Error in API sites list: ${error.message}`);
@@ -1603,55 +1663,17 @@ router.delete("/api/:domain", requireAuth, async (req, res) => {
   }
 });
 
-// Helper function to check git status
-async function checkGitStatus(sitePath, siteUser) {
-  try {
-    // Command to check if repo is up to date
-    const gitStatusCommand = `su - ${siteUser} -c 'cd "${sitePath}" && if [ -d ".git" ]; then 
-      git remote update > /dev/null 2>&1
-      LOCAL=$(git rev-parse @)
-      REMOTE=$(git rev-parse @{u})
-      BASE=$(git merge-base @ @{u})
-
-      if [ $LOCAL = $REMOTE ]; then
-        echo "up-to-date"
-      elif [ $LOCAL = $BASE ]; then
-        echo "need-pull"
-      elif [ $REMOTE = $BASE ]; then
-        echo "need-push"
-      else
-        echo "diverged"
-      fi
-    else
-      echo "not-git"
-    fi'`;
-
-    if (isDevelopment) {
-      const result = await executeSshCommand(gitStatusCommand);
-      return result.output.trim();
-    } else {
-      const execAsync = promisify(exec);
-      const result = await execAsync(gitStatusCommand);
-      return result.stdout.trim();
-    }
-  } catch (error) {
-    logger.warn(`Error checking git status for ${sitePath}: ${error.message}`);
-    return "error";
-  }
-}
 
 // Route to display setup history page
 router.get("/setup-history", async (req, res) => {
   try {
     // Get all setup records from database
     const setupData = await databaseService.getAllSetups();
-
     // Get all sites with timeout protection
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
     });
     const sites = await Promise.race([getSitesList(), timeoutPromise]);
-
     // Create sets for efficient lookup
     const sitesDomains = new Set(sites.map((site) => site.domain));
     const dbDomains = new Set(setupData.map((setup) => setup.domain_name));
@@ -2871,5 +2893,1836 @@ router.post(
     }
   }
 );
+
+async function getSitesListAll(page = 1, limit = 10, sortBy = 'domain', sortOrder = 'asc') {
+  try {
+    const sites = [];
+    
+    // Validate pagination parameters
+    page = Math.max(1, parseInt(page) || 1);
+    limit = Math.max(1, Math.min(100, parseInt(limit) || 10)); // Max 100 items per page
+    sortBy = ['domain', 'user', 'type', 'created', 'modified', 'size'].includes(sortBy) ? sortBy : 'domain';
+    sortOrder = ['asc', 'desc'].includes(sortOrder.toLowerCase()) ? sortOrder.toLowerCase() : 'asc';
+
+    if (isDevelopment) {
+      // Validate SSH configuration in development mode
+      if (!validateSshConfig()) {
+        throw new Error("Invalid SSH configuration for development mode");
+      }
+
+      // First, let's debug by checking what directories exist
+      const debugCommand = `ls -la /home/`;
+      const debugResult = await executeSshCommand(debugCommand);
+
+      // Simplified approach - check each known user directory
+      const checkUsersCommand = `
+        for user_dir in /home/*; do
+          if [ -d "$user_dir" ]; then
+            user=$(basename "$user_dir")
+            echo "USER_FOUND:$user"
+          fi
+        done
+        `;
+
+      const usersResult = await executeSshCommand(checkUsersCommand);
+      const userLines = usersResult.output
+        .split("\n")
+        .filter((line) => line.startsWith("USER_FOUND:"));
+
+      for (const userLine of userLines) {
+        const user = userLine.replace("USER_FOUND:", "");
+
+        // Skip system directories
+        if (["mysql", "setup", "clp"].includes(user)) continue;
+
+        // Check for htdocs and domains
+        const domainsCommand = `
+          htdocs_path="/home/${user}/htdocs"
+          if [ -d "$htdocs_path" ]; then
+            for domain_path in "$htdocs_path"/*; do
+              if [ -d "$domain_path" ]; then
+                domain=$(basename "$domain_path")
+                
+                # Get basic file info
+                stat_output=$(stat -c "%Y %Z %s" "$domain_path" 2>/dev/null || echo "0 0 0")
+                
+                # Determine site type with more comprehensive and accurate checks
+                site_type="Static"
+                site_framework=""
+                
+                # Priority 1: Check for Laravel (most specific PHP framework)
+                if [ -f "$domain_path/artisan" ] && [ -f "$domain_path/composer.json" ]; then
+                  if grep -q "laravel/framework" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="Laravel"
+                  elif [ -d "$domain_path/app" ] && [ -d "$domain_path/config" ] && [ -d "$domain_path/resources" ]; then
+                    site_type="Laravel"
+                  elif grep -q "lumen" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="Lumen"
+                  else
+                    site_type="PHP"
+                  fi
+                
+                # Priority 2: WordPress (most common CMS)
+                elif [ -f "$domain_path/wp-config.php" ] || [ -f "$domain_path/wp-config-sample.php" ] || \
+                     ([ -d "$domain_path/wp-content" ] && [ -d "$domain_path/wp-includes" ]); then
+                  site_type="WordPress"
+                
+                # Priority 3: Other PHP frameworks via composer.json
+                elif [ -f "$domain_path/composer.json" ]; then
+                  if grep -q "symfony/framework\\|symfony/symfony" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="Symfony"
+                  elif grep -q "codeigniter4/framework\\|codeigniter/framework" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="CodeIgniter"
+                  elif grep -q "cakephp/cakephp" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="CakePHP"
+                  elif grep -q "zendframework\\|laminas" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="Zend"
+                  elif grep -q "yiisoft/yii2" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="Yii"
+                  elif grep -q "phalcon" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="Phalcon"
+                  elif grep -q "slim/slim" "$domain_path/composer.json" 2>/dev/null; then
+                    site_type="Slim"
+                  else
+                    site_type="PHP"
+                  fi
+                
+                # Priority 4: Node.js applications
+                elif [ -f "$domain_path/package.json" ]; then
+                  if grep -q "\\"next\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Next.js"
+                  elif grep -q "\\"nuxt\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Nuxt.js"
+                  elif grep -q "\\"@remix-run\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Remix"
+                  elif grep -q "\\"gatsby\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Gatsby"
+                  elif grep -q "\\"@nestjs\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="NestJS"
+                  elif grep -q "\\"fastify\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Fastify"
+                  elif grep -q "\\"koa\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Koa"
+                  elif grep -q "\\"@hapi\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Hapi"
+                  elif grep -q "\\"express\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Express"
+                  elif grep -q "\\"react\\"\\|\\"@types/react\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="React"
+                  elif grep -q "\\"vue\\"\\|\\"@vue\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Vue.js"
+                  elif grep -q "\\"@angular\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Angular"
+                  elif grep -q "\\"svelte\\"" "$domain_path/package.json" 2>/dev/null; then
+                    if grep -q "\\"@sveltejs/kit\\"" "$domain_path/package.json" 2>/dev/null; then
+                      site_type="SvelteKit"
+                    else
+                      site_type="Svelte"
+                    fi
+                  elif grep -q "\\"astro\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Astro"
+                  elif grep -q "\\"@11ty/eleventy\\"" "$domain_path/package.json" 2>/dev/null; then
+                    site_type="Eleventy"
+                  else
+                    site_type="Node.js"
+                  fi
+                
+                # Priority 5: Python applications
+                elif [ -f "$domain_path/requirements.txt" ] || [ -f "$domain_path/Pipfile" ] || [ -f "$domain_path/pyproject.toml" ]; then
+                  if [ -f "$domain_path/manage.py" ]; then
+                    site_type="Django"
+                  elif grep -q "django\\|Django" "$domain_path/requirements.txt" 2>/dev/null || \
+                       grep -q "django\\|Django" "$domain_path/Pipfile" 2>/dev/null; then
+                    site_type="Django"
+                  elif grep -q "flask\\|Flask" "$domain_path/requirements.txt" 2>/dev/null || \
+                       grep -q "flask\\|Flask" "$domain_path/Pipfile" 2>/dev/null; then
+                    site_type="Flask"
+                  elif grep -q "fastapi\\|FastAPI" "$domain_path/requirements.txt" 2>/dev/null || \
+                       grep -q "fastapi\\|FastAPI" "$domain_path/Pipfile" 2>/dev/null; then
+                    site_type="FastAPI"
+                  elif grep -q "pyramid" "$domain_path/requirements.txt" 2>/dev/null; then
+                    site_type="Pyramid"
+                  elif grep -q "tornado" "$domain_path/requirements.txt" 2>/dev/null; then
+                    site_type="Tornado"
+                  elif grep -q "bottle" "$domain_path/requirements.txt" 2>/dev/null; then
+                    site_type="Bottle"
+                  elif grep -q "sanic" "$domain_path/requirements.txt" 2>/dev/null; then
+                    site_type="Sanic"
+                  elif grep -q "starlette" "$domain_path/requirements.txt" 2>/dev/null; then
+                    site_type="Starlette"
+                  else
+                    site_type="Python"
+                  fi
+                
+                # Priority 6: Ruby applications
+                elif [ -f "$domain_path/Gemfile" ]; then
+                  if grep -q "rails\\|Rails" "$domain_path/Gemfile" 2>/dev/null; then
+                    site_type="Ruby on Rails"
+                  elif grep -q "sinatra" "$domain_path/Gemfile" 2>/dev/null; then
+                    site_type="Sinatra"
+                  else
+                    site_type="Ruby"
+                  fi
+                
+                # Priority 7: Go applications
+                elif [ -f "$domain_path/go.mod" ]; then
+                  if grep -q "gin-gonic/gin" "$domain_path/go.mod" 2>/dev/null; then
+                    site_type="Gin"
+                  elif grep -q "labstack/echo" "$domain_path/go.mod" 2>/dev/null; then
+                    site_type="Echo"
+                  elif grep -q "gofiber/fiber" "$domain_path/go.mod" 2>/dev/null; then
+                    site_type="Fiber"
+                  else
+                    site_type="Go"
+                  fi
+                
+                # Priority 8: Rust applications
+                elif [ -f "$domain_path/Cargo.toml" ]; then
+                  if grep -q "actix-web" "$domain_path/Cargo.toml" 2>/dev/null; then
+                    site_type="Actix"
+                  elif grep -q "rocket" "$domain_path/Cargo.toml" 2>/dev/null; then
+                    site_type="Rocket"
+                  elif grep -q "warp" "$domain_path/Cargo.toml" 2>/dev/null; then
+                    site_type="Warp"
+                  else
+                    site_type="Rust"
+                  fi
+                
+                # Priority 9: Elixir/Phoenix
+                elif [ -f "$domain_path/mix.exs" ]; then
+                  site_type="Phoenix"
+                
+                # Priority 10: Other CMS by directory structure
+                elif [ -d "$domain_path/sites/all" ] && [ -f "$domain_path/index.php" ]; then
+                  site_type="Drupal"
+                elif [ -d "$domain_path/administrator" ] && [ -f "$domain_path/index.php" ] && [ -d "$domain_path/components" ]; then
+                  site_type="Joomla"
+                elif [ -f "$domain_path/app/etc/local.xml" ] || [ -f "$domain_path/app/etc/env.php" ]; then
+                  site_type="Magento"
+                elif [ -d "$domain_path/config" ] && [ -f "$domain_path/index.php" ] && [ -d "$domain_path/classes" ]; then
+                  site_type="PrestaShop"
+                elif [ -d "$domain_path/system" ] && [ -d "$domain_path/catalog" ] && [ -f "$domain_path/index.php" ]; then
+                  site_type="OpenCart"
+                elif [ -d "$domain_path/system" ] && [ -d "$domain_path/application" ] && [ -f "$domain_path/index.php" ]; then
+                  site_type="CodeIgniter"
+                elif [ -d "$domain_path/lib/Cake" ] || [ -d "$domain_path/cake" ]; then
+                  site_type="CakePHP"
+                
+                # Priority 11: Static site generators
+                elif [ -f "$domain_path/_config.yml" ]; then
+                  if [ -d "$domain_path/_posts" ]; then
+                    site_type="Jekyll"
+                  else
+                    site_type="Jekyll"
+                  fi
+                elif [ -f "$domain_path/gatsby-config.js" ] || [ -f "$domain_path/gatsby-config.ts" ]; then
+                  site_type="Gatsby"
+                elif [ -f "$domain_path/docusaurus.config.js" ] || [ -f "$domain_path/docusaurus.config.ts" ]; then
+                  site_type="Docusaurus"
+                elif [ -f "$domain_path/config.toml" ] || [ -f "$domain_path/config.yaml" ] || [ -f "$domain_path/config.yml" ]; then
+                  if [ -d "$domain_path/content" ]; then
+                    site_type="Hugo"
+                  fi
+                elif [ -f "$domain_path/.vuepress/config.js" ] || [ -d "$domain_path/.vuepress" ]; then
+                  site_type="VuePress"
+                elif [ -f "$domain_path/.eleventy.js" ] || [ -f "$domain_path/eleventy.config.js" ]; then
+                  site_type="Eleventy"
+                elif [ -f "$domain_path/_config.js" ] && [ -d "$domain_path/source" ]; then
+                  site_type="Hexo"
+                
+                # Priority 12: Basic language detection
+                elif [ -f "$domain_path/index.php" ] || find "$domain_path" -maxdepth 2 -name "*.php" -type f | head -1 | grep -q ".php"; then
+                  site_type="PHP"
+                elif [ -f "$domain_path/index.html" ] || [ -f "$domain_path/index.htm" ]; then
+                  if find "$domain_path" -maxdepth 2 -name "*.js" -type f | head -1 | grep -q ".js"; then
+                    site_type="JavaScript"
+                  else
+                    site_type="HTML"
+                  fi
+                elif find "$domain_path" -maxdepth 2 -name "*.js" -type f | head -1 | grep -q ".js"; then
+                  site_type="JavaScript"
+                fi
+                
+                # Check SSL
+                ssl_status="false"
+                if [ -d "/etc/letsencrypt/live/$domain" ]; then
+                  ssl_status="true"
+                fi
+                
+                # Get directory size
+                dir_size=$(du -sb "$domain_path" 2>/dev/null | cut -f1 || echo "0")
+                
+                echo "SITE_DATA|${user}|$domain|$domain_path|$site_type|$ssl_status|$stat_output|$dir_size"
+              fi
+            done
+          fi
+        `;
+
+        try {
+          const domainsResult = await executeSshCommand(domainsCommand);
+          const domainLines = domainsResult.output
+            .split("\n")
+            .filter((line) => line.startsWith("SITE_DATA|"));
+
+          for (const domainLine of domainLines) {
+            try {
+              const parts = domainLine.replace("SITE_DATA|", "").split("|");
+              if (parts.length >= 7) {
+                const [
+                  userName,
+                  domainName,
+                  domainPath,
+                  siteType,
+                  sslStatus,
+                  statData,
+                  dirSize,
+                ] = parts;
+                const [mtime, birthtime, size] = statData.split(" ");
+
+                // Get standardized framework information
+                const frameworkInfo = getFrameworkInfo(siteType);
+
+                // Extract values from .env file
+                const databaseName =
+                  (await extractEnvValue(domainPath, "DB_DATABASE")) ||
+                  (await extractEnvValue(domainPath, "DATABASE_NAME")) ||
+                  (await extractEnvValue(domainPath, "DB_NAME"));
+                const databaseUser =
+                  (await extractEnvValue(domainPath, "DB_USERNAME")) ||
+                  (await extractEnvValue(domainPath, "DATABASE_USER")) ||
+                  (await extractEnvValue(domainPath, "DB_USER"));
+                const databasePassword =
+                  (await extractEnvValue(domainPath, "DB_PASSWORD")) ||
+                  (await extractEnvValue(domainPath, "DATABASE_PASSWORD")) ||
+                  (await extractEnvValue(domainPath, "DB_PASS"));
+                const appKey =
+                  (await extractEnvValue(domainPath, "APP_KEY")) ||
+                  (await extractEnvValue(domainPath, "APP_SECRET")) ||
+                  (await extractEnvValue(domainPath, "SECRET_KEY"));
+
+                const siteInfo = {
+                  user: userName,
+                  domain: domainName,
+                  type: frameworkInfo.type,
+                  framework: frameworkInfo.framework,
+                  ssl: sslStatus === "true",
+                  path: domainPath,
+                  database: databaseName,
+                  database_user: databaseUser,
+                  database_password: databasePassword,
+                  app_key: appKey,
+                  created: new Date(parseInt(birthtime) * 1000),
+                  modified: new Date(parseInt(mtime) * 1000),
+                  size: parseInt(dirSize) || 0,
+                };
+
+                sites.push(siteInfo);
+              }
+            } catch (err) {
+              // Skip error logging for frontend access
+            }
+          }
+        } catch (err) {
+          // Skip error logging for frontend access
+        }
+      }
+    } else {
+      // Production environment - use direct file system access
+      try {
+        const homeDir = "/home";
+        
+        // Check if /home directory exists
+        if (!(await pathExists(homeDir))) {
+          logger.warn("Home directory /home does not exist, returning empty sites list");
+          return {
+            sites: [],
+            pagination: {
+              current_page: page,
+              per_page: limit,
+              total_items: 0,
+              total_pages: 0,
+              has_next_page: false,
+              has_prev_page: false,
+              next_page: null,
+              prev_page: null,
+              start_index: 0,
+              end_index: 0
+            }
+          };
+        }
+
+        const allUsers = await readDirectory(homeDir);
+
+        // Filter to only get valid user directories
+        const users = [];
+        for (const user of allUsers) {
+          try {
+            const userPath = path.posix.join(homeDir, user);
+            const userStats = await getStats(userPath);
+
+            // Only include if it's a directory and not a system/hidden directory
+            if (
+              userStats.isDirectory() &&
+              !["mysql", "setup", "clp", "lost+found", ".git"].includes(user) &&
+              !user.startsWith(".")
+            ) {
+              users.push(user);
+            }
+          } catch (err) {
+            // Skip entries we can't stat or that don't exist
+            continue;
+          }
+        }
+
+        for (const user of users) {
+          const userPath = path.posix.join(homeDir, user);
+
+          // Check for htdocs directory (standard CloudPanel structure)
+          const htdocsPath = path.posix.join(userPath, "htdocs");
+          if (!(await pathExists(htdocsPath))) {
+            continue;
+          }
+
+          try {
+            const allDomains = await readDirectory(htdocsPath);
+
+            // Filter to only get valid domain directories
+            const domains = [];
+            for (const domain of allDomains) {
+              try {
+                const domainPath = path.posix.join(htdocsPath, domain);
+                const domainStats = await getStats(domainPath);
+
+                // Only include if it's a directory and not a hidden file
+                if (domainStats.isDirectory() && !domain.startsWith(".")) {
+                  domains.push(domain);
+                }
+              } catch (err) {
+                // Skip entries we can't stat or that don't exist
+                continue;
+              }
+            }
+
+            for (const domain of domains) {
+              try {
+                const domainPath = path.posix.join(htdocsPath, domain);
+                
+                // Get domain info using the existing getDomainInfo function
+                // This already includes environment variable extraction
+                const domainInfo = await getDomainInfo(domainPath, domain, user);
+                
+                // Use the domain info directly since it already contains all necessary data
+                sites.push(domainInfo);
+              } catch (err) {
+                // Skip domains we can't access
+                logger.warn(
+                  `Cannot access domain ${domain} for user ${user}: ${err.message}`
+                );
+              }
+            }
+          } catch (err) {
+            // Skip users without htdocs directory or permission issues
+            logger.warn(
+              `Cannot access htdocs directory for user ${user}: ${err.message}`
+            );
+          }
+        }
+      } catch (error) {
+        logger.error(
+          `Error reading sites in production mode: ${error.message}`
+        );
+        throw new Error("Failed to read sites directory in production");
+      }
+    }
+
+    // Sort sites based on parameters
+    sites.sort((a, b) => {
+      let aValue = a[sortBy];
+      let bValue = b[sortBy];
+      
+      // Handle date sorting
+      if (sortBy === 'created' || sortBy === 'modified') {
+        aValue = aValue instanceof Date ? aValue.getTime() : 0;
+        bValue = bValue instanceof Date ? bValue.getTime() : 0;
+      }
+      
+      // Handle string sorting (case-insensitive)
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+      
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+
+    // Calculate pagination
+    const totalSites = sites.length;
+    const totalPages = Math.ceil(totalSites / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedSites = sites.slice(startIndex, endIndex);
+
+    // Build pagination metadata
+    const pagination = {
+      current_page: page,
+      per_page: limit,
+      total_items: totalSites,
+      total_pages: totalPages,
+      has_next_page: page < totalPages,
+      has_prev_page: page > 1,
+      next_page: page < totalPages ? page + 1 : null,
+      prev_page: page > 1 ? page - 1 : null,
+      start_index: startIndex + 1,
+      end_index: Math.min(endIndex, totalSites)
+    };
+
+    return {
+      sites: paginatedSites,
+      pagination: pagination
+    };
+  } catch (error) {
+    logger.error(`Error in getSitesList: ${error.message}`);
+    logger.error(`Stack trace: ${error.stack}`);
+    throw error;
+  }
+}
+router.get("/api/setup-history/sync-to-db", async (req, res) => {
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Operation timeout")), 120000); // 2 minute timeout for backup operations
+    });
+    console.log("sync-to-db");
+    // Get sites data first (get all sites without pagination for sync operation)
+    const result = await Promise.race([getSitesListAll(1, 1000, 'domain', 'asc'), timeoutPromise]);
+    const sites = result.sites; // Extract sites from the paginated result
+    
+    // Debug logging
+    logger.debug(`Sites response structure: ${JSON.stringify(result, null, 2)}`);
+    
+    // Check if sites data exists and has the expected structure
+    if (!sites || !Array.isArray(sites)) {
+      logger.error('Invalid sites data structure received');
+      return res.status(500).json({
+        success: false,
+        message: "Invalid sites data structure",
+        error: "Sites data is not in expected format",
+        debug_info: {
+          sites_exists: !!sites,
+          sites_is_array: !!(sites && Array.isArray(sites)),
+          sites_length: sites ? sites.length : null,
+          sites_structure: sites ? (Array.isArray(sites) ? 'array' : typeof sites) : null
+        }
+      });
+    }
+    
+    // Extract unique usernames from sites data
+    const usernames = [...new Set(sites.map(site => site.user))];
+    
+    // Save database backups for all users using existing backup info from sites_data
+    const backupResults = [];
+    for (const userName of usernames) {
+      try {
+        logger.debug(`Processing backup for user: ${userName}`);
+        logger.debug(`Current working directory: ${process.cwd()}`);
+        
+        // Find the site data for this user to get existing backup info
+        const userSite = sites.find(site => site.user === userName);
+        
+        if (userSite && userSite.database_backup && userSite.database_backup.exists) {
+          // Use existing backup info to save to local
+          const backupPath = userSite.database_backup.path;
+          const backupSize = userSite.database_backup.size;
+          
+          logger.debug(`Found existing backup for ${userName}: ${backupPath}`);
+          
+          const localBackupDir = path.join(process.cwd(), 'backups', userName);
+          const localFilePath = path.join(localBackupDir, 'db.sql.gz');
+          
+          // Create local backup directory if it doesn't exist
+          const fs = require('fs');
+          try {
+            await fs.promises.access(path.dirname(localBackupDir));
+          } catch {
+            await fs.promises.mkdir(path.dirname(localBackupDir), { recursive: true });
+          }
+          try {
+            await fs.promises.access(localBackupDir);
+          } catch {
+            await fs.promises.mkdir(localBackupDir, { recursive: true });
+          }
+          
+          // Remove existing backup file
+          try {
+            await fs.promises.access(localFilePath);
+            await fs.promises.unlink(localFilePath);
+            logger.debug(`Removed existing backup file: ${localFilePath}`);
+          } catch {
+            // File doesn't exist, continue
+          }
+          
+          // Copy backup file to local
+          try {
+            await fs.promises.copyFile(backupPath, localFilePath);
+            
+            // Verify file was copied successfully
+            const stats = await fs.promises.stat(localFilePath);
+            
+            backupResults.push({
+              user: userName,
+              success: true,
+              local_path: localFilePath,
+              size: stats.size,
+              message: `Database backup saved for ${userName}`
+            });
+            logger.debug(`Successfully saved backup for ${userName}: ${localFilePath}, size: ${stats.size} bytes`);
+          } catch (copyError) {
+            logger.error(`Failed to copy backup for ${userName}: ${copyError.message}`);
+            backupResults.push({
+              user: userName,
+              success: false,
+              message: `Failed to copy backup for ${userName}: ${copyError.message}`
+            });
+          }
+        } else {
+          backupResults.push({
+            user: userName,
+            success: false,
+            message: `No database backup found for ${userName}`
+          });
+          logger.debug(`No backup found for ${userName}`);
+        }
+      } catch (backupError) {
+        backupResults.push({
+          user: userName,
+          success: false,
+          message: `Failed to save backup for ${userName}: ${backupError.message}`
+        });
+        logger.error(`Error saving backup for ${userName}: ${backupError.message}`);
+        logger.error(`Error stack: ${backupError.stack}`);
+      }
+    }
+    
+    return res.json({
+      success: true,
+      message: "Setup history synced and database backups saved",
+      sites_count: sites.length,
+      users_count: usernames.length,
+      backup_results: backupResults,
+      sites_data: sites
+    });
+  } catch (error) {
+    logger.error(`Error in setup-history sync: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to sync sites data and save backups",
+      error: error.message,
+    });
+  }
+});
+
+// Get backup statistics for all users
+router.get("/backup-statistics", async (req, res) => {
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Operation timeout")), 30000); // 30 second timeout
+    });
+    const stats = await Promise.race([getBackupStatistics(), timeoutPromise]);
+    
+    // Helper function for formatting file size
+    const formatFileSize = (bytes) => {
+      if (bytes === 0) return "0 Bytes";
+      const k = 1024;
+      const sizes = ["Bytes", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    };
+
+    // Add formatted sizes to the response
+    const response = {
+      ...stats,
+      total_database_backup_size_formatted: formatFileSize(stats.total_database_backup_size),
+      total_site_backup_size_formatted: formatFileSize(stats.total_site_backup_size),
+      total_backup_size: stats.total_database_backup_size + stats.total_site_backup_size,
+      total_backup_size_formatted: formatFileSize(stats.total_database_backup_size + stats.total_site_backup_size),
+      backup_coverage: {
+        database: stats.total_users > 0 ? Math.round((stats.users_with_database_backups / stats.total_users) * 100) : 0,
+        site: stats.total_users > 0 ? Math.round((stats.users_with_site_backups / stats.total_users) * 100) : 0
+      }
+    };
+
+    return res.json(response);
+  } catch (error) {
+    logger.error(`Error getting backup statistics: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get backup statistics",
+      error: error.message,
+    });
+  }
+});
+
+// Save backup to local project directory
+router.post("/save-backup", async (req, res) => {
+  try {
+    const { userName, backupType = 'database' } = req.body;
+
+    // Validate input
+    if (!userName) {
+      return res.status(400).json({
+        success: false,
+        message: "userName is required"
+      });
+    }
+
+    if (!['database', 'site'].includes(backupType)) {
+      return res.status(400).json({
+        success: false,
+        message: "backupType must be 'database' or 'site'"
+      });
+    }
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Operation timeout")), 120000); // 2 minute timeout for file operations
+    });
+
+    const result = await Promise.race([saveBackupToLocal(userName, backupType), timeoutPromise]);
+
+    if (result) {
+      // Helper function for formatting file size
+      const formatFileSize = (bytes) => {
+        if (bytes === 0) return "0 Bytes";
+        const k = 1024;
+        const sizes = ["Bytes", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+      };
+
+      return res.json({
+        success: true,
+        message: `${backupType} backup saved successfully for user ${userName}`,
+        data: {
+          ...result,
+          size_formatted: formatFileSize(result.size)
+        }
+      });
+    } else {
+      return res.status(404).json({
+        success: false,
+        message: `No ${backupType} backup found for user ${userName}`
+      });
+    }
+  } catch (error) {
+    logger.error(`Error saving backup: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save backup",
+      error: error.message,
+    });
+  }
+});
+
+// Get list of local backups
+router.get("/local-backups", async (req, res) => {
+  try {
+    const { userName } = req.query;
+    const localBackupDir = path.join(__dirname, '../../backups');
+
+    if (!fs.existsSync(localBackupDir)) {
+      return res.json({
+        success: true,
+        message: "No local backups found",
+        data: {
+          backups: [],
+          total_size: 0,
+          total_size_formatted: "0 Bytes"
+        }
+      });
+    }
+
+    const backups = [];
+    let totalSize = 0;
+
+    if (userName) {
+      // Get backups for specific user
+      const userBackupDir = path.join(localBackupDir, userName);
+      if (fs.existsSync(userBackupDir)) {
+        const userFiles = await fs.readdir(userBackupDir);
+        for (const file of userFiles) {
+          const filePath = path.join(userBackupDir, file);
+          try {
+            const stats = await fs.stat(filePath);
+            const backupInfo = {
+              user: userName,
+              file: file,
+              path: filePath,
+              size: stats.size,
+              modified: stats.mtime,
+              type: file.startsWith('database_') ? 'database' : 'site'
+            };
+            backups.push(backupInfo);
+            totalSize += stats.size;
+          } catch (statError) {
+            logger.warn(`Cannot stat backup file ${filePath}: ${statError.message}`);
+          }
+        }
+      }
+    } else {
+      // Get all backups for all users
+      const users = await fs.readdir(localBackupDir);
+      for (const user of users) {
+        const userBackupDir = path.join(localBackupDir, user);
+        try {
+          const userStats = await fs.stat(userBackupDir);
+          if (userStats.isDirectory()) {
+            const userFiles = await fs.readdir(userBackupDir);
+            for (const file of userFiles) {
+              const filePath = path.join(userBackupDir, file);
+              try {
+                const stats = await fs.stat(filePath);
+                const backupInfo = {
+                  user: user,
+                  file: file,
+                  path: filePath,
+                  size: stats.size,
+                  modified: stats.mtime,
+                  type: file.startsWith('database_') ? 'database' : 'site'
+                };
+                backups.push(backupInfo);
+                totalSize += stats.size;
+              } catch (statError) {
+                logger.warn(`Cannot stat backup file ${filePath}: ${statError.message}`);
+              }
+            }
+          }
+        } catch (userStatError) {
+          logger.warn(`Cannot stat user backup directory ${userBackupDir}: ${userStatError.message}`);
+        }
+      }
+    }
+
+    // Helper function for formatting file size
+    const formatFileSize = (bytes) => {
+      if (bytes === 0) return "0 Bytes";
+      const k = 1024;
+      const sizes = ["Bytes", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    };
+
+    // Sort backups by modification date (newest first)
+    backups.sort((a, b) => b.modified - a.modified);
+
+    return res.json({
+      success: true,
+      message: `Found ${backups.length} local backup(s)`,
+      data: {
+        backups: backups.map(backup => ({
+          ...backup,
+          size_formatted: formatFileSize(backup.size)
+        })),
+        total_size: totalSize,
+        total_size_formatted: formatFileSize(totalSize),
+        user_filter: userName || 'all'
+      }
+    });
+  } catch (error) {
+    logger.error(`Error getting local backups: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get local backups",
+      error: error.message,
+    });
+  }
+});
+
+// Delete local backup
+router.delete("/local-backup", async (req, res) => {
+  try {
+    const { userName, fileName } = req.body;
+
+    // Validate input
+    if (!userName || !fileName) {
+      return res.status(400).json({
+        success: false,
+        message: "userName and fileName are required"
+      });
+    }
+
+    const localBackupDir = path.join(process.cwd(), 'backups', userName);
+    const filePath = path.join(localBackupDir, fileName);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: `Backup file ${fileName} not found for user ${userName}`
+      });
+    }
+
+    try {
+      const stats = await fs.stat(filePath);
+      if (stats.isDirectory()) {
+        await fs.rm(filePath, { recursive: true, force: true });
+      } else {
+        await fs.unlink(filePath);
+      }
+
+      logger.info(`Deleted local backup: ${filePath}`);
+
+      return res.json({
+        success: true,
+        message: `Backup ${fileName} deleted successfully for user ${userName}`,
+        data: {
+          deleted_file: fileName,
+          user: userName,
+          deleted_at: new Date()
+        }
+      });
+    } catch (deleteError) {
+      logger.error(`Failed to delete backup ${filePath}: ${deleteError.message}`);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to delete backup file",
+        error: deleteError.message
+      });
+    }
+  } catch (error) {
+    logger.error(`Error deleting local backup: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete local backup",
+      error: error.message,
+    });
+  }
+});
+
+// Save all backups for a specific user
+router.post("/save-all-backups", async (req, res) => {
+  try {
+    const { userName } = req.body;
+
+    // Validate input
+    if (!userName) {
+      return res.status(400).json({
+        success: false,
+        message: "userName is required"
+      });
+    }
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Operation timeout")), 300000); // 5 minute timeout for multiple operations
+    });
+
+    const results = await Promise.race([
+      Promise.all([
+        saveBackupToLocal(userName, 'database'),
+        saveBackupToLocal(userName, 'site')
+      ]),
+      timeoutPromise
+    ]);
+
+    const [databaseResult, siteResult] = results;
+    const savedBackups = [];
+
+    if (databaseResult) {
+      savedBackups.push({
+        type: 'database',
+        ...databaseResult
+      });
+    }
+
+    if (siteResult) {
+      savedBackups.push({
+        type: 'site',
+        ...siteResult
+      });
+    }
+
+    // Helper function for formatting file size
+    const formatFileSize = (bytes) => {
+      if (bytes === 0) return "0 Bytes";
+      const k = 1024;
+      const sizes = ["Bytes", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    };
+
+    const totalSize = savedBackups.reduce((sum, backup) => sum + backup.size, 0);
+
+    return res.json({
+      success: true,
+      message: `Saved ${savedBackups.length} backup(s) for user ${userName}`,
+      data: {
+        user: userName,
+        saved_backups: savedBackups.map(backup => ({
+          ...backup,
+          size_formatted: formatFileSize(backup.size)
+        })),
+        total_size: totalSize,
+        total_size_formatted: formatFileSize(totalSize)
+      }
+    });
+  } catch (error) {
+    logger.error(`Error saving all backups: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save backups",
+      error: error.message,
+    });
+  }
+});
+
+// Helper function to get the latest backup file from a directory
+async function getLatestBackupFile(backupPath) {
+  try {
+    if (isDevelopment) {
+      // Use SSH to find the latest backup file
+      const command = `find "${backupPath}" -type f \\( -name "*.sql.gz" -o -name "*.sql" -o -name "*.tar.gz" -o -name "*.tar" -o -name "*.zip" -o -name "*.gz" -o -name "backup.sql" -o -name "backup.sql.gz" \\) 2>/dev/null | sort -r | head -1`;
+      const result = await executeSshCommand(command);
+      
+      if (result.output && result.output.trim() && !result.output.includes("No such file")) {
+        return result.output.trim();
+      }
+    } else {
+      // Use local file system in production mode
+      const { exec } = require("child_process");
+      const { promisify } = require("util");
+      const execAsync = promisify(exec);
+      
+      try {
+        const { stdout } = await execAsync(
+          `find "${backupPath}" -type f \\( -name "*.sql.gz" -o -name "*.sql" -o -name "*.tar.gz" -o -name "*.tar" -o -name "*.zip" -o -name "*.gz" -o -name "backup.sql" -o -name "backup.sql.gz" \\) 2>/dev/null | sort -r | head -1`
+        );
+        
+        if (stdout && stdout.trim()) {
+          return stdout.trim();
+        }
+      } catch (execError) {
+        logger.debug(`No backup files found in ${backupPath}: ${execError.message}`);
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    logger.debug(`Error finding latest backup in ${backupPath}: ${error.message}`);
+    return null;
+  }
+}
+
+// Helper function to get the latest backup folder and find backup file inside it
+async function getLatestBackupFromFolder(backupPath) {
+  try {
+    logger.debug(`Searching for latest backup in: ${backupPath}`);
+    
+    if (isDevelopment) {
+      // First, get all subdirectories in the backup path
+      const subdirsCommand = `find "${backupPath}" -maxdepth 1 -type d | grep -v "^${backupPath}$" | head -1`;
+      const subdirsResult = await executeSshCommand(subdirsCommand);
+      
+      logger.debug(`Subdirs command result: ${subdirsResult.output}`);
+      
+      if (subdirsResult.output && subdirsResult.output.trim()) {
+        const subdir = subdirsResult.output.trim();
+        const subdirPath = subdir; // subdir already contains full path
+        
+        logger.debug(`Subdir found: ${subdir}, searching in: ${subdirPath}`);
+        
+        // Now get the latest date folder
+        const folderCommand = `ls -1 "${subdirPath}" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | sort -r | head -1`;
+        const folderResult = await executeSshCommand(folderCommand);
+        
+        logger.debug(`Folder command result: ${folderResult.output}`);
+        
+        if (folderResult.output && folderResult.output.trim()) {
+          const latestFolder = folderResult.output.trim();
+          const folderPath = `${subdirPath}/${latestFolder}`;
+          
+          logger.debug(`Latest folder found: ${latestFolder}, searching in: ${folderPath}`);
+          
+          // Now find backup file inside the latest folder
+          const fileCommand = `find "${folderPath}" -type f \\( -name "*.sql.gz" -o -name "*.sql" -o -name "*.tar.gz" -o -name "*.tar" -o -name "*.zip" -o -name "*.gz" -o -name "backup.sql" -o -name "backup.sql.gz" -o -name "*_*.sql.gz" \\) 2>/dev/null | sort -r | head -1`;
+          const fileResult = await executeSshCommand(fileCommand);
+          
+          logger.debug(`File command result: ${fileResult.output}`);
+          
+          if (fileResult.output && fileResult.output.trim() && !fileResult.output.includes("No such file")) {
+            const foundFile = fileResult.output.trim();
+            logger.debug(`Found backup file: ${foundFile}`);
+            return foundFile;
+          }
+        }
+      }
+    } else {
+      // Production mode - use local file system
+      const { exec } = require("child_process");
+      const { promisify } = require("util");
+      const execAsync = promisify(exec);
+      
+      try {
+        // First, get all subdirectories in the backup path
+        const { stdout: subdirsStdout } = await execAsync(
+          `find "${backupPath}" -maxdepth 1 -type d | grep -v "^${backupPath}$" | head -1`
+        );
+        
+        logger.debug(`Production subdirs command result: ${subdirsStdout}`);
+        
+        if (subdirsStdout && subdirsStdout.trim()) {
+          const subdir = subdirsStdout.trim();
+          const subdirPath = subdir; // subdir already contains full path
+          
+          logger.debug(`Production subdir found: ${subdir}, searching in: ${subdirPath}`);
+          
+          // Now get the latest date folder
+          const { stdout: folderStdout } = await execAsync(
+            `ls -1 "${subdirPath}" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' | sort -r | head -1`
+          );
+          
+          logger.debug(`Production folder command result: ${folderStdout}`);
+          
+          if (folderStdout && folderStdout.trim()) {
+            const latestFolder = folderStdout.trim();
+            const folderPath = `${subdirPath}/${latestFolder}`;
+            
+            logger.debug(`Production latest folder found: ${latestFolder}, searching in: ${folderPath}`);
+            
+            // Now find backup file inside the latest folder
+            const { stdout: fileStdout } = await execAsync(
+              `find "${folderPath}" -type f \\( -name "*.sql.gz" -o -name "*.sql" -o -name "*.tar.gz" -o -name "*.tar" -o -name "*.zip" -o -name "*.gz" -o -name "backup.sql" -o -name "backup.sql.gz" -o -name "*_*.sql.gz" \\) 2>/dev/null | sort -r | head -1`
+            );
+            
+            logger.debug(`Production file command result: ${fileStdout}`);
+            
+            if (fileStdout && fileStdout.trim()) {
+              const foundFile = fileStdout.trim();
+              logger.debug(`Production found backup file: ${foundFile}`);
+              return foundFile;
+            }
+          }
+        }
+      } catch (execError) {
+        logger.debug(`No backup folders or files found in ${backupPath}: ${execError.message}`);
+        logger.debug(`Exec error details: ${JSON.stringify(execError)}`);
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    logger.debug(`Error finding latest backup folder in ${backupPath}: ${error.message}`);
+    return null;
+  }
+}
+
+// Helper function to get database backup information
+async function getDatabaseBackupInfo(userName) {
+  try {
+    const backupPath = `/home/${userName}/backups/databases`;
+    
+    if (isDevelopment) {
+      // Check if backup directory exists via SSH
+      const checkCommand = `[ -d "${backupPath}" ] && echo "EXISTS" || echo "NOT_EXISTS"`;
+      const checkResult = await executeSshCommand(checkCommand);
+      
+      if (checkResult.output.trim() !== "EXISTS") {
+        return null;
+      }
+      
+      // Get the latest backup file from the latest folder
+      const latestBackup = await getLatestBackupFromFolder(backupPath);
+      
+      if (latestBackup) {
+        // Get file size and modification time
+        const statCommand = `stat -c "%s %Y" "${latestBackup}" 2>/dev/null || echo "0 0"`;
+        const statResult = await executeSshCommand(statCommand);
+        const [size, mtime] = statResult.output.trim().split(" ");
+        
+        return {
+          path: latestBackup,
+          size: parseInt(size) || 0,
+          modified: new Date(parseInt(mtime) * 1000),
+          exists: true
+        };
+      }
+    } else {
+      // Production mode - use local file system
+      if (!(await pathExists(backupPath))) {
+        return null;
+      }
+      
+      const latestBackup = await getLatestBackupFromFolder(backupPath);
+      
+      if (latestBackup) {
+        try {
+          const stats = await fs.stat(latestBackup);
+          return {
+            path: latestBackup,
+            size: stats.size,
+            modified: stats.mtime,
+            exists: true
+          };
+        } catch (statError) {
+          logger.debug(`Error getting stats for ${latestBackup}: ${statError.message}`);
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    logger.debug(`Error getting database backup info for ${userName}: ${error.message}`);
+    return null;
+  }
+}
+
+// Helper function to save backup file to local project directory
+async function saveBackupToLocal(userName, backupType = 'database') {
+  try {
+    logger.debug(`saveBackupToLocal called for user: ${userName}, type: ${backupType}`);
+    logger.debug(`Current working directory: ${process.cwd()}`);
+    logger.debug(`__dirname: ${__dirname}`);
+    
+    const localBackupDir = path.join(process.cwd(), 'backups', userName);
+    const remoteBackupPath = backupType === 'database' 
+      ? `/home/${userName}/backups/databases`
+      : `/home/${userName}/backups`;
+    
+    logger.debug(`Local backup dir: ${localBackupDir}`);
+    logger.debug(`Remote backup path: ${remoteBackupPath}`);
+    logger.debug(`isDevelopment: ${isDevelopment}`);
+
+    // Create local backup directory if it doesn't exist
+    if (!fs.existsSync(path.dirname(localBackupDir))) {
+      await fs.promises.mkdir(path.dirname(localBackupDir), { recursive: true });
+    }
+    if (!fs.existsSync(localBackupDir)) {
+      await fs.promises.mkdir(localBackupDir, { recursive: true });
+    }
+
+    // Get the latest backup file/folder from remote
+    let latestBackup = null;
+    if (backupType === 'database') {
+      latestBackup = await getLatestBackupFromFolder(remoteBackupPath);
+    } else {
+      // For site backups, get the latest folder
+      if (isDevelopment) {
+        const findCommand = `find "${remoteBackupPath}" -maxdepth 1 -type d -not -name "databases" -not -name "backups" | sort -r | head -1`;
+        const result = await executeSshCommand(findCommand);
+        if (result.output && result.output.trim() && !result.output.includes("No such file")) {
+          latestBackup = result.output.trim();
+        }
+      } else {
+        const { exec } = require("child_process");
+        const { promisify } = require("util");
+        const execAsync = promisify(exec);
+        
+        try {
+          const { stdout } = await execAsync(
+            `find "${remoteBackupPath}" -maxdepth 1 -type d -not -name "databases" -not -name "backups" | sort -r | head -1`
+          );
+          if (stdout && stdout.trim()) {
+            latestBackup = stdout.trim();
+          }
+        } catch (execError) {
+          logger.debug(`No site backup folders found in ${remoteBackupPath}: ${execError.message}`);
+        }
+      }
+    }
+
+    if (!latestBackup) {
+      logger.warn(`No ${backupType} backup found for user ${userName}`);
+      logger.debug(`Backup path checked: ${remoteBackupPath}`);
+      logger.debug(`isDevelopment: ${isDevelopment}`);
+      return null;
+    }
+    
+    logger.debug(`Found latest backup: ${latestBackup}`);
+
+    // Generate local filename - use db.sql.gz for database backups
+    let localFileName;
+    if (backupType === 'database') {
+      localFileName = 'db.sql.gz';
+    } else {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupName = path.basename(latestBackup);
+      localFileName = `${backupType}_${backupName}_${timestamp}`;
+    }
+    const localFilePath = path.join(localBackupDir, localFileName);
+
+    // Remove existing backup files of the same type
+    const existingFiles = await fs.promises.readdir(localBackupDir);
+    for (const file of existingFiles) {
+      let shouldRemove = false;
+      if (backupType === 'database' && file === 'db.sql.gz') {
+        shouldRemove = true;
+      } else if (backupType !== 'database' && file.startsWith(`${backupType}_`)) {
+        shouldRemove = true;
+      }
+      
+      if (shouldRemove) {
+        const filePath = path.join(localBackupDir, file);
+        try {
+          const stats = await fs.promises.stat(filePath);
+          if (stats.isDirectory()) {
+            await fs.promises.rm(filePath, { recursive: true, force: true });
+          } else {
+            await fs.promises.unlink(filePath);
+          }
+          logger.debug(`Removed existing ${backupType} backup: ${file}`);
+        } catch (removeError) {
+          logger.warn(`Failed to remove existing backup ${file}: ${removeError.message}`);
+        }
+      }
+    }
+
+    // Copy backup from remote to local
+    if (isDevelopment) {
+      // Use SSH to copy file
+      const copyCommand = backupType === 'database' 
+        ? `cp "${latestBackup}" "/tmp/db.sql.gz" && echo "COPIED:/tmp/db.sql.gz"`
+        : `cp -r "${latestBackup}" "/tmp/${localFileName}" && echo "COPIED:/tmp/${localFileName}"`;
+      
+      const copyResult = await executeSshCommand(copyCommand);
+      if (copyResult.output.includes("COPIED:")) {
+        const tempPath = copyResult.output.split("COPIED:")[1].trim();
+        
+        // Download file from remote to local
+        const downloadCommand = backupType === 'database'
+          ? `scp ${sshConfig.user}@${sshConfig.host}:"${tempPath}" "${localFilePath}"`
+          : `scp ${sshConfig.user}@${sshConfig.host}:"${tempPath}" "${localFilePath}"`;
+        const { exec } = require("child_process");
+        const { promisify } = require("util");
+        const execAsync = promisify(exec);
+        
+        try {
+          await execAsync(downloadCommand);
+          
+          // Clean up temp file on remote
+          const tempFileToRemove = backupType === 'database' ? '/tmp/db.sql.gz' : tempPath;
+          await executeSshCommand(`rm -rf "${tempFileToRemove}"`);
+          
+          logger.info(`Successfully saved ${backupType} backup for ${userName} to ${localFilePath}`);
+          return {
+            local_path: localFilePath,
+            remote_path: latestBackup,
+            size: (await fs.promises.stat(localFilePath)).size,
+            saved_at: new Date(),
+            type: backupType
+          };
+        } catch (downloadError) {
+          logger.error(`Failed to download ${backupType} backup for ${userName}: ${downloadError.message}`);
+          return null;
+        }
+      }
+    } else {
+      // Production mode - direct file copy
+      try {
+        if (backupType === 'database') {
+          // Copy file
+          await fs.promises.copyFile(latestBackup, localFilePath);
+        } else {
+          // Copy directory
+          const { exec } = require("child_process");
+          const { promisify } = require("util");
+          const execAsync = promisify(exec);
+          
+          await execAsync(`cp -r "${latestBackup}" "${localFilePath}"`);
+        }
+        
+        logger.info(`Successfully saved ${backupType} backup for ${userName} to ${localFilePath}`);
+        return {
+          local_path: localFilePath,
+          remote_path: latestBackup,
+          size: (await fs.promises.stat(localFilePath)).size,
+          saved_at: new Date(),
+          type: backupType
+        };
+      } catch (copyError) {
+        logger.error(`Failed to copy ${backupType} backup for ${userName}: ${copyError.message}`);
+        return null;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    logger.error(`Error saving ${backupType} backup for ${userName}: ${error.message}`);
+    return null;
+  }
+}
+
+// Helper function to get backup statistics for all users
+async function getBackupStatistics() {
+  try {
+    const homeDir = "/home";
+    const stats = {
+      total_users: 0,
+      users_with_database_backups: 0,
+      users_with_site_backups: 0,
+      total_database_backup_size: 0,
+      total_site_backup_size: 0,
+      latest_backup_date: null,
+      backup_summary: []
+    };
+
+    if (isDevelopment) {
+      // Use SSH to get backup statistics
+      const command = `
+        total_users=0
+        db_backup_users=0
+        site_backup_users=0
+        total_db_size=0
+        total_site_size=0
+        latest_date=0
+        
+        for user_dir in /home/*; do
+          if [ -d "$user_dir" ]; then
+            user=$(basename "$user_dir")
+            if [[ ! "mysql setup clp" =~ $user ]]; then
+              ((total_users++))
+              
+              # Check database backups
+              db_backup_path="/home/$user/backups/databases"
+              if [ -d "$db_backup_path" ]; then
+                latest_db=$(find "$db_backup_path" -type f \\( -name "*.sql.gz" -o -name "*.sql" -o -name "*.tar.gz" -o -name "*.tar" -o -name "*.zip" -o -name "*.gz" -o -name "backup.sql" -o -name "backup.sql.gz" \\) 2>/dev/null | sort -r | head -1)
+                if [ -n "$latest_db" ]; then
+                  ((db_backup_users++))
+                  db_size=$(stat -c "%s" "$latest_db" 2>/dev/null || echo "0")
+                  total_db_size=$((total_db_size + db_size))
+                  db_date=$(stat -c "%Y" "$latest_db" 2>/dev/null || echo "0")
+                  if [ $db_date -gt $latest_date ]; then
+                    latest_date=$db_date
+                  fi
+                fi
+              fi
+              
+              # Check site backups
+              site_backup_path="/home/$user/backups"
+              if [ -d "$site_backup_path" ]; then
+                latest_site=$(find "$site_backup_path" -maxdepth 1 -type d -not -name "databases" -not -name "backups" | sort -r | head -1)
+                if [ -n "$latest_site" ]; then
+                  ((site_backup_users++))
+                  site_size=$(du -sb "$latest_site" 2>/dev/null | cut -f1 || echo "0")
+                  total_site_size=$((total_site_size + site_size))
+                  site_date=$(stat -c "%Y" "$latest_site" 2>/dev/null || echo "0")
+                  if [ $site_date -gt $latest_date ]; then
+                    latest_date=$site_date
+                  fi
+                fi
+              fi
+            fi
+          fi
+        done
+        
+        echo "STATS:$total_users:$db_backup_users:$site_backup_users:$total_db_size:$total_site_size:$latest_date"
+      `;
+      
+      const result = await executeSshCommand(command);
+      const statLine = result.output.split("\n").find(line => line.startsWith("STATS:"));
+      
+      if (statLine) {
+        const [, totalUsers, dbBackupUsers, siteBackupUsers, totalDbSize, totalSiteSize, latestDate] = statLine.split(":");
+        stats.total_users = parseInt(totalUsers) || 0;
+        stats.users_with_database_backups = parseInt(dbBackupUsers) || 0;
+        stats.users_with_site_backups = parseInt(siteBackupUsers) || 0;
+        stats.total_database_backup_size = parseInt(totalDbSize) || 0;
+        stats.total_site_backup_size = parseInt(totalSiteSize) || 0;
+        stats.latest_backup_date = latestDate && latestDate !== "0" ? new Date(parseInt(latestDate) * 1000) : null;
+      }
+    } else {
+      // Production mode - use local file system
+      if (!(await pathExists(homeDir))) {
+        return stats;
+      }
+
+      const allUsers = await readDirectory(homeDir);
+      
+      for (const user of allUsers) {
+        try {
+          const userPath = path.posix.join(homeDir, user);
+          const userStats = await getStats(userPath);
+
+          if (
+            userStats.isDirectory() &&
+            !["mysql", "setup", "clp", "lost+found", ".git"].includes(user) &&
+            !user.startsWith(".")
+          ) {
+            stats.total_users++;
+            
+            // Check database backups
+            const dbBackup = await getDatabaseBackupInfo(user);
+            if (dbBackup) {
+              stats.users_with_database_backups++;
+              stats.total_database_backup_size += dbBackup.size;
+              if (!stats.latest_backup_date || dbBackup.modified > stats.latest_backup_date) {
+                stats.latest_backup_date = dbBackup.modified;
+              }
+            }
+            
+            // Check site backups
+            const siteBackup = await getSiteBackupInfo(user);
+            if (siteBackup) {
+              stats.users_with_site_backups++;
+              stats.total_site_backup_size += siteBackup.size;
+              if (!stats.latest_backup_date || siteBackup.modified > stats.latest_backup_date) {
+                stats.latest_backup_date = siteBackup.modified;
+              }
+            }
+          }
+        } catch (err) {
+          // Skip entries we can't access
+          continue;
+        }
+      }
+    }
+
+    return stats;
+  } catch (error) {
+    logger.error(`Error getting backup statistics: ${error.message}`);
+    return {
+      total_users: 0,
+      users_with_database_backups: 0,
+      users_with_site_backups: 0,
+      total_database_backup_size: 0,
+      total_site_backup_size: 0,
+      latest_backup_date: null,
+      backup_summary: []
+    };
+  }
+}
+
+// Helper function to get site backup information
+async function getSiteBackupInfo(userName) {
+  try {
+    const backupPath = `/home/${userName}/backups`;
+    
+    if (isDevelopment) {
+      // Check if backup directory exists via SSH
+      const checkCommand = `[ -d "${backupPath}" ] && echo "EXISTS" || echo "NOT_EXISTS"`;
+      const checkResult = await executeSshCommand(checkCommand);
+      
+      if (checkResult.output.trim() !== "EXISTS") {
+        return null;
+      }
+      
+      // Find the latest backup folder (excluding databases folder)
+      const findCommand = `find "${backupPath}" -maxdepth 1 -type d -not -name "databases" -not -name "backups" | sort -r | head -1`;
+      const findResult = await executeSshCommand(findCommand);
+      
+      if (findResult.output && findResult.output.trim() && !findResult.output.includes("No such file")) {
+        const latestFolder = findResult.output.trim();
+        
+        // Get folder size and modification time
+        const statCommand = `du -sb "${latestFolder}" 2>/dev/null | cut -f1 || echo "0"`;
+        const sizeResult = await executeSshCommand(statCommand);
+        const size = parseInt(sizeResult.output.trim()) || 0;
+        
+        const mtimeCommand = `stat -c "%Y" "${latestFolder}" 2>/dev/null || echo "0"`;
+        const mtimeResult = await executeSshCommand(mtimeCommand);
+        const mtime = parseInt(mtimeResult.output.trim()) || 0;
+        
+        return {
+          path: latestFolder,
+          size: size,
+          modified: new Date(mtime * 1000),
+          exists: true
+        };
+      }
+    } else {
+      // Production mode - use local file system
+      if (!(await pathExists(backupPath))) {
+        return null;
+      }
+      
+      try {
+        const { exec } = require("child_process");
+        const { promisify } = require("util");
+        const execAsync = promisify(exec);
+        
+        // Find the latest backup folder (excluding databases folder)
+        const { stdout } = await execAsync(
+          `find "${backupPath}" -maxdepth 1 -type d -not -name "databases" -not -name "backups" | sort -r | head -1`
+        );
+        
+        if (stdout && stdout.trim()) {
+          const latestFolder = stdout.trim();
+          
+          // Get folder size
+          const { stdout: sizeOutput } = await execAsync(`du -sb "${latestFolder}" 2>/dev/null | cut -f1 || echo "0"`);
+          const size = parseInt(sizeOutput.trim()) || 0;
+          
+          // Get folder stats
+          const stats = await fs.stat(latestFolder);
+          
+          return {
+            path: latestFolder,
+            size: size,
+            modified: stats.mtime,
+            exists: true
+          };
+        }
+      } catch (execError) {
+        logger.debug(`Error finding site backup for ${userName}: ${execError.message}`);
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    logger.debug(`Error getting site backup info for ${userName}: ${error.message}`);
+    return null;
+  }
+}
+
+// Helper function to extract values from .env files and other configuration files
+async function extractEnvValue(projectPath, key) {
+  try {
+    // Try multiple possible configuration file locations
+    const possibleConfigPaths = [
+      // .env files
+      path.posix.join(projectPath, ".env"),
+      path.posix.join(projectPath, "..", ".env"),
+      path.posix.join(projectPath, "public", ".env"),
+      path.posix.join(projectPath, "app", ".env"),
+      path.posix.join(projectPath, "config", ".env"),
+      path.posix.join(projectPath, ".env.local"),
+      path.posix.join(projectPath, ".env.production"),
+      path.posix.join(projectPath, ".env.example"),
+      // Other common config files
+      path.posix.join(projectPath, "config", "database.php"),
+      path.posix.join(projectPath, "config", "app.php"),
+      path.posix.join(projectPath, "wp-config.php"),
+      path.posix.join(projectPath, "application", "config", "database.php"),
+    ];
+
+    let configPath = null;
+    for (const configFile of possibleConfigPaths) {
+      if (await pathExists(configFile)) {
+        configPath = configFile;
+        break;
+      }
+    }
+
+    if (!configPath) {
+      logger.debug(`No configuration file found in ${projectPath} or parent directories`);
+      return null;
+    }
+
+    if (isDevelopment) {
+      // Use SSH grep command in development mode
+      const grepCommand = `grep -E "(^${key}=|['\"]${key}['\"]\\s*=>\\s*['\"])" "${configPath}" | head -1 | sed -E "s/.*${key}[=:]+\\s*['\"]?([^'\"]*)['\"]?.*/\\1/"`;
+      const result = await executeSshCommand(grepCommand);
+
+      if (result.output && result.output.trim()) {
+        return result.output.trim();
+      }
+    } else {
+      // Use local file system in production mode
+      try {
+        const content = await fs.readFile(configPath, "utf-8");
+        const lines = content.split("\n");
+
+        for (const line of lines) {
+          // Skip comments and empty lines
+          if (line.trim() && !line.trim().startsWith("#") && !line.trim().startsWith("//")) {
+            // Check for .env format: KEY=value
+            if (line.startsWith(`${key}=`)) {
+              const value = line.substring(key.length + 1).trim();
+              const cleanValue = value.replace(/^["']|["']$/g, "");
+              logger.debug(`Found ${key}=${cleanValue} in ${configPath}`);
+              return cleanValue;
+            }
+            
+            // Check for PHP array format: 'KEY' => 'value' or "KEY" => "value"
+            const phpPattern = new RegExp(`['"]${key}['"]\\s*=>\\s*['"]([^'"]*)['"]`);
+            const phpMatch = line.match(phpPattern);
+            if (phpMatch) {
+              const cleanValue = phpMatch[1];
+              logger.debug(`Found ${key}=${cleanValue} in ${configPath} (PHP format)`);
+              return cleanValue;
+            }
+            
+            // Check for define() format: define('KEY', 'value')
+            const definePattern = new RegExp(`define\\s*\\(\\s*['"]${key}['"]\\s*,\\s*['"]([^'"]*)['"]`);
+            const defineMatch = line.match(definePattern);
+            if (defineMatch) {
+              const cleanValue = defineMatch[1];
+              logger.debug(`Found ${key}=${cleanValue} in ${configPath} (define format)`);
+              return cleanValue;
+            }
+          }
+        }
+        
+        logger.debug(`Key ${key} not found in ${configPath}`);
+      } catch (readError) {
+        logger.warn(
+          `Error reading configuration file at ${configPath}: ${readError.message}`
+        );
+      }
+    }
+
+    return null;
+  } catch (error) {
+    logger.debug(`Error in extractEnvValue for ${key} in ${projectPath}: ${error.message}`);
+    return null;
+  }
+}
+
+// Download backup file
+router.get("/api/download-backup/:userName", async (req, res) => {
+  try {
+    const { userName } = req.params;
+    const { type = 'database' } = req.query;
+    
+    // Validate input
+    if (!userName) {
+      return res.status(400).json({
+        success: false,
+        message: "userName is required"
+      });
+    }
+    
+    if (!['database', 'site'].includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: "type must be 'database' or 'site'"
+      });
+    }
+    
+    // Determine file path based on type
+    let fileName;
+    if (type === 'database') {
+      fileName = 'db.sql.gz';
+    } else {
+      fileName = 'db.tar.gz';
+    }
+    
+    const filePath = path.join(process.cwd(), 'backups', userName, fileName);
+    
+    // Check if file exists
+    try {
+      await fs.promises.access(filePath);
+    } catch (error) {
+      return res.status(404).json({
+        success: false,
+        message: `Backup file not found for user ${userName}`
+      });
+    }
+    
+    // Get file stats
+    const stats = await fs.promises.stat(filePath);
+    
+    // Set headers for file download
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${userName}_${type}_backup_${new Date().toISOString().split('T')[0]}.${type === 'database' ? 'sql.gz' : 'tar.gz'}"`);
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+    
+    // Handle stream errors
+    fileStream.on('error', (error) => {
+      logger.error(`Error streaming backup file for ${userName}: ${error.message}`);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: "Error streaming backup file"
+        });
+      }
+    });
+    
+  } catch (error) {
+    logger.error(`Error downloading backup: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to download backup",
+      error: error.message,
+    });
+  }
+});
+
+// List available backup files
+router.get("/api/database/list-backups", async (req, res) => {
+  try {
+    const backupDir = path.join(process.cwd(), 'backups');
+    
+    // Check if backup directory exists
+    try {
+      await fs.promises.access(backupDir);
+    } catch (error) {
+      return res.json({
+        success: true,
+        message: "No backup directory found",
+        backups: []
+      });
+    }
+    
+    // Get all user directories
+    const userDirs = await fs.promises.readdir(backupDir);
+    const backups = [];
+    
+    for (const userDir of userDirs) {
+      const userPath = path.join(backupDir, userDir);
+      const userStats = await fs.promises.stat(userPath);
+      
+      if (userStats.isDirectory()) {
+        const userBackups = [];
+        
+        // Check for database backup
+        const dbBackupPath = path.join(userPath, 'db.sql.gz');
+        try {
+          await fs.promises.access(dbBackupPath);
+          const dbStats = await fs.promises.stat(dbBackupPath);
+          userBackups.push({
+            type: 'database',
+            filename: 'db.sql.gz',
+            size: dbStats.size,
+            modified: dbStats.mtime,
+            download_url: `/sites/api/download-backup/${userDir}?type=database`
+          });
+        } catch (error) {
+          // Database backup not found
+        }
+        
+        // Check for site backup
+        const siteBackupPath = path.join(userPath, 'db.tar.gz');
+        try {
+          await fs.promises.access(siteBackupPath);
+          const siteStats = await fs.promises.stat(siteBackupPath);
+          userBackups.push({
+            type: 'site',
+            filename: 'db.tar.gz',
+            size: siteStats.size,
+            modified: siteStats.mtime,
+            download_url: `/sites/api/download-backup/${userDir}?type=site`
+          });
+        } catch (error) {
+          // Site backup not found
+        }
+        
+        if (userBackups.length > 0) {
+          backups.push({
+            user: userDir,
+            backups: userBackups
+          });
+        }
+      }
+    }
+    
+    return res.json({
+      success: true,
+      message: "Backup files listed successfully",
+      backups: backups
+    });
+    
+  } catch (error) {
+    logger.error(`Error listing backups: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      message: "Failed to list backups",
+      error: error.message,
+    });
+  }
+});
 
 module.exports = router;

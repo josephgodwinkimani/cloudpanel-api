@@ -2,6 +2,7 @@ const session = require("express-session");
 const redis = require("redis");
 const RedisStore = require("connect-redis").default;
 const SQLiteStore = require("connect-sqlite3")(session);
+const MySQLSessionStore = require("./mysqlSessionStore");
 const path = require("path");
 const fs = require("fs");
 const logger = require("./logger");
@@ -18,14 +19,14 @@ class SessionStore {
       if (process.env.REDIS_URL || process.env.REDIS_HOST) {
         await this.initializeRedisStore();
       } else {
-        this.initializeSQLiteStore();
+        await this.initializeMySQLStore();
       }
     } catch (error) {
       logger.warn(
-        "Failed to initialize Redis store, falling back to SQLite store:",
+        "Failed to initialize Redis store, falling back to MySQL store:",
         error.message
       );
-      this.initializeSQLiteStore();
+      await this.initializeMySQLStore();
     }
   }
 
@@ -80,6 +81,20 @@ class SessionStore {
     });
 
     logger.info("Redis session store initialized successfully");
+  }
+
+  async initializeMySQLStore() {
+    // Create MySQL store
+    this.store = new MySQLSessionStore({
+      host: '127.0.0.1',
+      user: 'root',
+      password: 'fafa',
+      database: 'cloudpanelapidb',
+      table: 'sessions',
+      connectionLimit: 10
+    });
+
+    logger.info("MySQL session store initialized successfully");
   }
 
   initializeSQLiteStore() {
