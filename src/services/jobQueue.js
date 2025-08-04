@@ -1027,9 +1027,9 @@ class JobQueue {
         gitInfo = result.stdout;
       }
 
-      // Step 2: Perform the actual git pull
-      logger.info(`Performing git pull for ${domainName}...`);
-      const gitPullCommand = `su - ${siteUser} -c 'cd "${sitePath}" && GIT_SSH_COMMAND="${sshCommand}" git pull origin \$(git branch --show-current) 2>&1'`;
+      // Step 2: Perform the actual git pull with force reset
+      logger.info(`Performing git reset and pull for ${domainName}...`);
+      const gitPullCommand = `su - ${siteUser} -c 'cd "${sitePath}" && GIT_SSH_COMMAND="${sshCommand}" git fetch origin && git reset --hard origin/$(git branch --show-current) && git pull origin $(git branch --show-current) 2>&1'`;
 
       let pullResult;
       if (isDevelopment) {
