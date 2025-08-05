@@ -2,6 +2,7 @@ const { exec } = require("child_process");
 const { Client } = require("ssh2");
 const logger = require("../utils/logger");
 const ResponseUtils = require("../utils/responseUtils");
+const { API_NODE_URL } = require('../config');
 
 class CloudPanelService {
   constructor() {
@@ -1376,9 +1377,8 @@ class CloudPanelService {
       "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
     const sitePath = `/home/${siteUser}/htdocs/${domainName}`;
     const deleteCommand = `rm -rf ${sitePath}/* ${sitePath}/.* 2>/dev/null || true`;
-    const baseCommand = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone${
-      isBranch ? ` -b ${branch} --single-branch` : ""
-    } "${repoUrl}" .'`;
+    const baseCommand = `su - ${siteUser} -c 'cd "${sitePath}" && ${deleteCommand} && GIT_SSH_COMMAND="${sshCommand}" git clone${isBranch ? ` -b ${branch} --single-branch` : ""
+      } "${repoUrl}" .'`;
 
     if (this.isDevelopment && this.sshConfig.host) {
       try {
@@ -1481,6 +1481,7 @@ cp .env.example .env &&
 sed -i "s/^APP_ENV=.*/APP_ENV=${appEnv}/" .env &&
 sed -i "s/^APP_DEBUG=.*/APP_DEBUG=${appDebug}/" .env &&
 sed -i "s|^APP_URL=.*|APP_URL=${appUrl}|" .env &&
+sed -i "s|^APP_NODE_URL=.*|APP_NODE_URL=${API_NODE_URL}|" .env &&
 sed -i "s/^DB_HOST=.*/DB_HOST=${dbHost}/" .env &&
 sed -i "s/^DB_DATABASE=.*/DB_DATABASE=${dbDatabase}/" .env &&
 sed -i "s/^DB_USERNAME=.*/DB_USERNAME=${dbUsername}/" .env &&
