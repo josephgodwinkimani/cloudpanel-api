@@ -1048,7 +1048,7 @@ class JobQueue {
       // Step 3: Run Laravel optimization commands if it's a Laravel project
       logger.info(`Running optimizations for ${domainName}...`);
       let optimizationResult = "";
-      const laravelOptimizeCommand = `su - ${siteUser} -c 'cd "${sitePath}" && if [ -f "artisan" ]; then echo "=== Running Laravel optimizations ===" && composer install --no-dev --optimize-autoloader --quiet 2>&1 && php artisan optimize:clear && php artisan migrate --force 2>&1 && echo "Laravel optimizations completed"; else echo "Not a Laravel project, skipping optimizations"; fi'`;
+      const laravelOptimizeCommand = `su - ${siteUser} -c 'cd "${sitePath}" && if [ -f "artisan" ]; then echo "=== Running Laravel optimizations ===" && composer install --no-dev --prefer-dist --optimize-autoloader --classmap-authoritative --quiet 2>&1 && php artisan optimize:clear && php artisan migrate --force 2>&1 && echo "Laravel optimizations completed"; else echo "Not a Laravel project, skipping optimizations"; fi'`;
       
       if (isDevelopment) {
         const sshResult = await executeSshCommand(laravelOptimizeCommand);
