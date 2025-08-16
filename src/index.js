@@ -32,7 +32,9 @@ const authRoutes = require("./routes/auth");
 const docsRoutes = require("./routes/docs");
 const setupRoutes = require("./routes/setup");
 const sitesRoutes = require("./routes/sites");
+const minimalSitesRoutes = require("./routes/minimal-sites");
 const logsRoutes = require("./routes/logs");
+const jobsRoutes = require("./routes/jobs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -148,7 +150,9 @@ async function initializeApp() {
   app.use("/auth", authRoutes);
   app.use("/docs", docsRoutes);
   app.use("/sites", sitesRoutes);
+  app.use("/lists", minimalSitesRoutes);
   app.use("/logs", logsRoutes);
+  app.use("/jobs", jobsRoutes);
   app.use("/setup", setupRoutes);
 
   // Enhanced error logging middleware (must be before error handler)

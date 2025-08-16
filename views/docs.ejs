@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,65 +23,95 @@
         }
     </script>
 </head>
+
 <body class="bg-gray-50 font-sans">
     <div class="max-w-7xl mx-auto p-6">
         <div class="bg-white rounded-lg shadow-lg overflow-hidden">
             <!-- Navigation Header -->
             <nav class="bg-white border-b border-gray-200 shadow-sm">
-                <div class="px-8 py-4">
+                <div class="px-4 lg:px-8 py-4">
                     <div class="flex justify-between items-center">
                         <!-- Logo/Brand -->
-                        <div class="flex items-center space-x-4">
-                            <div class="text-2xl font-bold text-blue-600">CloudPanel</div>
-                            <span class="text-gray-400">|</span>
-                            <span class="text-gray-600 font-medium">API Management</span>
+                        <div class="flex items-center space-x-2 lg:space-x-4">
+                            <div class="text-xl lg:text-2xl font-bold text-blue-600">
+                                CloudPanel
+                            </div>
+                            <span class="text-gray-400 hidden sm:inline">|</span>
+                            <span class="text-gray-600 font-medium hidden sm:inline">API Management</span>
                         </div>
-                        
+
                         <!-- Navigation Menu -->
-                        <div class="flex items-center space-x-6">
-                            <a href="/docs" class="flex items-center px-4 py-2 text-blue-600 bg-blue-50 rounded-lg font-medium transition-all duration-200 hover:bg-blue-100">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        <div class="flex items-center space-x-2 lg:space-x-6">
+                            <a href="/docs"
+                                class="flex items-center px-2 lg:px-4 py-2 text-blue-600 bg-blue-50 rounded-lg font-medium transition-all duration-200 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base">
+                                <svg class="w-4 h-4 lg:w-5 lg:h-5 mr-1 lg:mr-2" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253">
+                                    </path>
                                 </svg>
-                                Docs
+                                <span class="hidden sm:inline">Docs</span>
                             </a>
-                            <a href="/sites" class="flex items-center px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9"></path>
+                            <a href="/lists/minimal"
+                                class="flex items-center px-2 lg:px-4 py-2 text-blue-600 text-gray-600 hover:bg-blue-100 text-sm lg:text-base">
+                                <svg class="w-4 h-4 lg:w-5 lg:h-5 mr-1 lg:mr-2" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                                    </path>
                                 </svg>
-                                Site Lists
+                                <span class="hidden sm:inline">Sites</span>
                             </a>
-                            <a href="/sites/setup-history" class="flex items-center px-2 lg:px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base">
-                                <svg class="w-4 h-4 lg:w-5 lg:h-5 mr-1 lg:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <a href="/jobs/monitor"
+                                class="flex items-center px-2 lg:px-4 py-2 text-gray-600 hover:bg-blue-100 text-sm lg:text-base">
+                                <svg class="w-4 h-4 lg:w-5 lg:h-5 mr-1 lg:mr-2" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 5H7a2 2 0 00-2 2v6a2 2 0 002 2h2m0 0h2m-2 0v4a2 2 0 002 2h2a2 2 0 002-2v-4m0 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v6z">
+                                    </path>
                                 </svg>
-                                <span class="hidden sm:inline">Setup History</span>
+                                <span class="hidden sm:inline">Jobs Monitor</span>
                             </a>
-                            <a href="/logs" class="flex items-center px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            <a href="/logs"
+                                class="flex items-center px-2 lg:px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base">
+                                <svg class="w-4 h-4 lg:w-5 lg:h-5 mr-1 lg:mr-2" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                    </path>
                                 </svg>
-                                Logs
+                                <span class="hidden sm:inline">Logs</span>
                             </a>
-                            
+
                             <!-- User Menu -->
                             <div class="relative group">
-                                <button class="flex items-center px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                <button
+                                    class="flex items-center px-2 lg:px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg font-medium transition-all duration-200 text-sm lg:text-base">
+                                    <svg class="w-4 h-4 lg:w-5 lg:h-5 mr-1 lg:mr-2" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
+                                        </path>
                                     </svg>
-                                    Account
-                                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    <span class="hidden sm:inline">Account</span>
+                                    <svg class="w-3 h-3 lg:w-4 lg:h-4 ml-1" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
-                                
+
                                 <!-- Dropdown Menu -->
-                                <div class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                                <div
+                                    class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                                     <div class="py-2">
-                                        <a href="/auth/logout" class="block px-4 py-2 text-red-600 hover:bg-red-50 transition-colors duration-200">
-                                            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                        <a href="/auth/logout"
+                                            class="block px-4 py-2 text-red-600 hover:bg-red-50 transition-colors duration-200 text-sm">
+                                            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                                                </path>
                                             </svg>
                                             Logout
                                         </a>
@@ -91,43 +122,49 @@
                     </div>
                 </div>
             </nav>
-            
+
             <!-- Header -->
             <div class="relative bg-gradient-to-r from-blue-600 to-purple-600 text-white p-8 text-center">
                 <h1 class="text-3xl font-bold mb-2">CloudPanel API Documentation</h1>
                 <p class="text-blue-100">Complete API reference with examples for CloudPanel management</p>
             </div>
-            
+
             <div class="p-8">
                 <!-- Search and Navigation -->
                 <div class="mb-8">
                     <div class="relative mb-6">
-                        <input 
-                            type="text" 
-                            id="search-input" 
-                            placeholder="Search endpoints..." 
-                            class="w-full px-4 py-3 pl-12 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
+                        <input type="text" id="search-input" placeholder="Search endpoints..."
+                            class="w-full px-4 py-3 pl-12 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                         </div>
                     </div>
-                    
+
                     <!-- Quick Navigation -->
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                         <h3 class="font-semibold text-blue-800 mb-3">📚 Quick Navigation</h3>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <a href="#cloudflare" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🌩️ Cloudflare</a>
-                            <a href="#cloudpanel" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">☁️ CloudPanel</a>
-                            <a href="#database" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🗄️ Database</a>
-                            <a href="#user-management" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">👥 User Management</a>
-                            <a href="#site-management" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🌐 Site Management</a>
-                            <a href="#letsencrypt" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🔒 Let's Encrypt</a>
-                            <a href="#vhost-templates" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">📄 VHost Templates</a>
-                            <a href="#setup" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">⚙️ Setup</a>
-                            <a href="#logs" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">📋 Logs</a>
+                            <a href="#cloudflare" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🌩️
+                                Cloudflare</a>
+                            <a href="#cloudpanel" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">☁️
+                                CloudPanel</a>
+                            <a href="#database" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🗄️
+                                Database</a>
+                            <a href="#user-management"
+                                class="text-blue-600 hover:text-blue-800 hover:underline text-sm">👥 User Management</a>
+                            <a href="#site-management"
+                                class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🌐 Site Management</a>
+                            <a href="#letsencrypt" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">🔒
+                                Let's Encrypt</a>
+                            <a href="#vhost-templates"
+                                class="text-blue-600 hover:text-blue-800 hover:underline text-sm">📄 VHost Templates</a>
+                            <a href="#setup" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">⚙️
+                                Setup</a>
+                            <a href="#logs" class="text-blue-600 hover:text-blue-800 hover:underline text-sm">📋
+                                Logs</a>
                         </div>
                     </div>
                 </div>
@@ -138,45 +175,52 @@
                         <div class="text-yellow-600 mr-3 text-xl">🔐</div>
                         <div>
                             <strong class="text-yellow-800">Authentication Required:</strong>
-                            <span class="text-yellow-700 ml-2">All API endpoints require API key authentication via the <code class="bg-yellow-100 px-1 rounded text-sm">X-API-Key</code> header.</span>
+                            <span class="text-yellow-700 ml-2">All API endpoints require API key authentication via the
+                                <code class="bg-yellow-100 px-1 rounded text-sm">X-API-Key</code> header.</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Cloudflare Section -->
                 <div class="mb-12" id="cloudflare">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🌩️ Cloudflare</h2>
-                    
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🌩️ Cloudflare
+                    </h2>
+
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/cloudflare/update-ips</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Update Cloudflare IP addresses in server configuration</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Headers</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "Content-Type": "application/json",
   "X-API-Key": "your-api-key-here"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body (Optional)</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   // No body parameters required
 }</pre>
                                 </div>
                             </div>
-                            
+
                             <div class="mt-6">
                                 <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
                                 <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
@@ -188,7 +232,7 @@
   }
 }</pre>
                             </div>
-                            
+
                             <div class="mt-6">
                                 <h4 class="font-semibold text-gray-800 mb-2">cURL Example</h4>
                                 <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">curl -X POST "<%= baseUrl %>/api/cloudflare/update-ips" \
@@ -202,29 +246,33 @@
                 <!-- CloudPanel Section -->
                 <div class="mb-12" id="cloudpanel">
                     <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">☁️ CloudPanel</h2>
-                    
+
                     <!-- Enable Basic Auth -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/cloudpanel/basic-auth/enable</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Enable basic authentication for CloudPanel</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "userName": "admin",
   "password": "secure-password-123"
 }</pre>
-                                    
+
                                     <table class="w-full mt-4 text-sm border-collapse">
                                         <thead>
                                             <tr class="bg-gray-100">
@@ -238,22 +286,26 @@
                                             <tr>
                                                 <td class="border border-gray-300 px-3 py-2">userName</td>
                                                 <td class="border border-gray-300 px-3 py-2">string</td>
-                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
-                                                <td class="border border-gray-300 px-3 py-2">Username for basic auth</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">
+                                                    Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Username for basic auth
+                                                </td>
                                             </tr>
                                             <tr>
                                                 <td class="border border-gray-300 px-3 py-2">password</td>
                                                 <td class="border border-gray-300 px-3 py-2">string</td>
-                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">
+                                                    Required</td>
                                                 <td class="border border-gray-300 px-3 py-2">Password (min 6 chars)</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Basic authentication enabled successfully",
   "data": {
@@ -265,30 +317,36 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Disable Basic Auth -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-red-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-red-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">DELETE</span>
-                                <span class="font-mono font-bold text-gray-800">/api/cloudpanel/basic-auth/disable</span>
+                                <span
+                                    class="inline-block bg-red-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">DELETE</span>
+                                <span
+                                    class="font-mono font-bold text-gray-800">/api/cloudpanel/basic-auth/disable</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Disable basic authentication for CloudPanel</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">No body required</pre>
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">No body required</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Basic authentication disabled successfully",
   "data": {
@@ -304,32 +362,37 @@
                 <!-- Database Section -->
                 <div class="mb-12" id="database">
                     <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🗄️ Database</h2>
-                    
+
                     <!-- Get Master Credentials -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
+                                <span
+                                    class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
                                 <span class="font-mono font-bold text-gray-800">/api/database/master-credentials</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Retrieve master database credentials</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Headers</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "X-API-Key": "your-api-key-here"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Master credentials retrieved successfully",
   "data": {
@@ -343,31 +406,35 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Add Database -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/database/add</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Create a new database with user</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "example.com",
   "databaseName": "myapp_production",
   "databaseUserName": "myapp_user",
   "databaseUserPassword": "secure-db-password-123"
 }</pre>
-                                    
+
                                     <table class="w-full mt-4 text-sm border-collapse">
                                         <thead>
                                             <tr class="bg-gray-100">
@@ -381,34 +448,41 @@
                                             <tr>
                                                 <td class="border border-gray-300 px-3 py-2">domainName</td>
                                                 <td class="border border-gray-300 px-3 py-2">string</td>
-                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">
+                                                    Required</td>
                                                 <td class="border border-gray-300 px-3 py-2">Associated domain name</td>
                                             </tr>
                                             <tr>
                                                 <td class="border border-gray-300 px-3 py-2">databaseName</td>
                                                 <td class="border border-gray-300 px-3 py-2">string</td>
-                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
-                                                <td class="border border-gray-300 px-3 py-2">Name of database to create</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">
+                                                    Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Name of database to create
+                                                </td>
                                             </tr>
                                             <tr>
                                                 <td class="border border-gray-300 px-3 py-2">databaseUserName</td>
                                                 <td class="border border-gray-300 px-3 py-2">string</td>
-                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
-                                                <td class="border border-gray-300 px-3 py-2">Database user to create</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">
+                                                    Required</td>
+                                                <td class="border border-gray-300 px-3 py-2">Database user to create
+                                                </td>
                                             </tr>
                                             <tr>
                                                 <td class="border border-gray-300 px-3 py-2">databaseUserPassword</td>
                                                 <td class="border border-gray-300 px-3 py-2">string</td>
-                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">Required</td>
+                                                <td class="border border-gray-300 px-3 py-2 text-red-600 font-bold">
+                                                    Required</td>
                                                 <td class="border border-gray-300 px-3 py-2">Password (min 6 chars)</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Database added successfully",
   "data": {
@@ -426,26 +500,31 @@
 
                 <!-- User Management Section -->
                 <div class="mb-12" id="user-management">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">👥 User Management</h2>
-                    
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">👥 User Management
+                    </h2>
+
                     <!-- Add User -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/user/add</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Create a new CloudPanel user</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "userName": "newuser",
   "email": "user@example.com",
   "firstName": "John",
@@ -456,10 +535,11 @@
   "status": "1"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "User added successfully",
   "data": {
@@ -473,32 +553,37 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- List Users -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
+                                <span
+                                    class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
                                 <span class="font-mono font-bold text-gray-800">/api/user/list</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">List all CloudPanel users</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Headers</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "X-API-Key": "your-api-key-here"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Users retrieved successfully",
   "data": [
@@ -518,26 +603,31 @@
 
                 <!-- Site Management Section -->
                 <div class="mb-12" id="site-management">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🌐 Site Management</h2>
-                    
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🌐 Site Management
+                    </h2>
+
                     <!-- Add PHP Site -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/site/add/php</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Create a new PHP website</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "example.com",
   "phpVersion": "8.3",
   "vhostTemplate": "Laravel 12",
@@ -545,10 +635,11 @@
   "siteUserPassword": "secure-password-123"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "PHP site added successfully",
   "data": {
@@ -562,25 +653,29 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Add Node.js Site -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/site/add/nodejs</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Create a new Node.js website</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "nodeapp.com",
   "nodejsVersion": 20,
   "appPort": 3000,
@@ -588,10 +683,11 @@
   "siteUserPassword": "secure-password-123"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Node.js site added successfully",
   "data": {
@@ -610,33 +706,40 @@
 
                 <!-- Let's Encrypt SSL Section -->
                 <div class="mb-12" id="letsencrypt">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🔒 Let's Encrypt SSL</h2>
-                    
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">🔒 Let's Encrypt
+                        SSL</h2>
+
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
-                                <span class="font-mono font-bold text-gray-800">/api/letsencrypt/install-certificate</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="font-mono font-bold text-gray-800">/api/letsencrypt/install-certificate</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Install SSL certificate from Let's Encrypt</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "example.com",
   "subjectAlternativeName": "www.example.com"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Let's Encrypt certificate installed successfully",
   "data": {
@@ -653,33 +756,39 @@
 
                 <!-- VHost Templates Section -->
                 <div class="mb-12" id="vhost-templates">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">📄 VHost Templates</h2>
-                    
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">📄 VHost Templates
+                    </h2>
+
                     <!-- List Templates -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
+                                <span
+                                    class="inline-block bg-green-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">GET</span>
                                 <span class="font-mono font-bold text-gray-800">/api/vhost-templates/list</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">List all available vhost templates</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Headers</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "X-API-Key": "your-api-key-here"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Vhost templates retrieved successfully",
   "data": [
@@ -697,30 +806,35 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Import Templates -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-blue-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/vhost-templates/import</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Import vhost templates from GitHub repository</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">No body required</pre>
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">No body required</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Vhost templates imported successfully",
   "data": {
@@ -736,25 +850,30 @@
 
                 <!-- Setup Section -->
                 <div class="mb-12" id="setup">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">⚙️ Laravel Setup</h2>
-                    
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">⚙️ Laravel Setup
+                    </h2>
+
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-purple-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/setup</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Setup a complete Laravel site with PHP and database</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "laravel-app.com",
   "phpVersion": "8.3",
   "vhostTemplate": "Laravel 12",
@@ -770,10 +889,11 @@
   "installComposer": true
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Laravel setup completed successfully",
   "timestamp": "2025-06-22T12:00:00Z"
@@ -787,25 +907,29 @@
                 <!-- Additional Site Management Endpoints -->
                 <div class="mb-12">
                     <h3 class="text-xl font-bold text-gray-800 mb-4">🔧 Additional Site Management</h3>
-                    
+
                     <!-- Add Python Site -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-yellow-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/site/add/python</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Create a new Python website</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "python-app.com",
   "pythonVersion": "3.11",
   "appPort": 8000,
@@ -813,10 +937,11 @@
   "siteUserPassword": "secure-password-123"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Python site added successfully",
   "data": {
@@ -831,34 +956,39 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Add Static Site -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-gray-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/site/add/static</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Create a new static HTML website</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "static-site.com",
   "siteUser": "staticuser",
   "siteUserPassword": "secure-password-123"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Static site added successfully",
   "data": {
@@ -871,35 +1001,40 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Add Reverse Proxy -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-indigo-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/site/add/reverse-proxy</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Create a reverse proxy configuration</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "proxy.example.com",
   "reverseProxyUrl": "http://localhost:3000",
   "siteUser": "proxyuser",
   "siteUserPassword": "secure-password-123"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Reverse proxy added successfully",
   "data": {
@@ -913,35 +1048,40 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Install Site Certificate -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-green-600">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
+                                <span
+                                    class="inline-block bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">POST</span>
                                 <span class="font-mono font-bold text-gray-800">/api/site/install-certificate</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Install a custom SSL certificate for a site</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "example.com",
   "privateKey": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----",
   "certificate": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----",
   "certificateChain": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Certificate installed successfully",
   "data": {
@@ -953,33 +1093,38 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Delete Site -->
                     <div class="bg-gray-50 rounded-lg p-6 mb-6 border-l-4 border-red-500">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center">
-                                <span class="inline-block bg-red-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">DELETE</span>
+                                <span
+                                    class="inline-block bg-red-500 text-white px-3 py-1 rounded text-sm font-bold mr-4">DELETE</span>
                                 <span class="font-mono font-bold text-gray-800">/api/site/delete</span>
                             </div>
-                            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200" onclick="toggleDetails(this)">
+                            <button
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors duration-200"
+                                onclick="toggleDetails(this)">
                                 Show Details
                             </button>
                         </div>
                         <p class="text-gray-600 italic mb-4">Delete a site and its configuration</p>
-                        
+
                         <div class="details hidden">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Request Body</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "domainName": "example.com",
   "force": false
 }</pre>
                                 </div>
-                                
+
                                 <div>
                                     <h4 class="font-semibold text-gray-800 mb-2">Response Example</h4>
-                                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
+                                    <pre
+                                        class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">{
   "success": true,
   "message": "Site deleted successfully",
   "data": {
@@ -1001,7 +1146,7 @@
         function toggleDetails(button) {
             const details = button.closest('.bg-gray-50').querySelector('.details');
             const isHidden = details.classList.contains('hidden');
-            
+
             if (isHidden) {
                 details.classList.remove('hidden');
                 button.textContent = 'Hide Details';
@@ -1010,11 +1155,12 @@
                 button.textContent = 'Show Details';
             }
         }
-        
+
         // Add click handlers when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             console.log('CloudPanel API Documentation loaded successfully');
         });
     </script>
 </body>
+
 </html>

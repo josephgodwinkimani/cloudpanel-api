@@ -157,14 +157,14 @@ const logger = winston.createLogger({
 });
 
 // If we're not in production then log to the console as well
-if (process.env.NODE_ENV !== 'production') {
+// if (process.env.NODE_ENV !== 'production') {
   logger.add(new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),
       winston.format.simple()
     )
   }));
-}
+// }
 
 // Enhanced logging methods with action categorization
 logger.logAction = function(level, action, message, details = {}, metadata = {}) {
